@@ -1,0 +1,4 @@
+# Files Obot's git catalog sync (and `obot mcp validate-catalog`) should read.
+# A non-empty list replaces Obot's default (*.json, *.yaml, *.yml everywhere).
+remotes/*.yaml
+vmcps/*.yaml

@@ -1,0 +1,27 @@
+# Run `pre-commit install` once per clone. CI runs the same checks.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-json
+      # icons/ must stay byte-identical to the upstream icon URLs.
+      - id: end-of-file-fixer
+        exclude: ^icons/
+      - id: trailing-whitespace
+        exclude: ^icons/
+      - id: check-merge-conflict
+      - id: detect-private-key
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [--strict]
+  - repo: local
+    hooks:
+      - id: validate-catalog
+        name: validate catalog entries (scripts/validate.py)
+        entry: uv run --frozen scripts/validate.py
+        language: system
+        files: ^(remotes/|icons/|schema/|scripts/validate\.py$)
+        pass_filenames: false

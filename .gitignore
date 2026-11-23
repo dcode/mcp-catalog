@@ -1,0 +1,21 @@
+# Python / uv
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Local tooling
+/bin/
+/.obot-cli/
+*.tar.gz
+
+# Secrets must never be committed
+.env
+*.env
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

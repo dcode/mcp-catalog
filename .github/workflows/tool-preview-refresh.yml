@@ -1,0 +1,82 @@
+name: tool-preview-refresh
+
+# Regenerates toolPreview from each server's unauthenticated tools/list and
+# opens (or updates) a PR when Google's tool surface changes.
+# Requires Settings > Actions > General > "Allow GitHub Actions to create and
+# approve pull requests".
+#
+# PRs opened with the default GITHUB_TOKEN do not trigger other workflows, so
+# the required `validate` check would never run on the refresh PR. Store a
+# fine-grained PAT (this repo only; Contents: read/write, Pull requests:
+# read/write) or a GitHub App token as the CATALOG_AUTOMATION_TOKEN secret.
+# Without it the workflow still opens the PR, but you must close and reopen it
+# (or push to it) to run CI.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      entry:
+        description: entryKey to refresh (blank = all)
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Regenerate toolPreview
+        id: refresh
+        env:
+          ENTRY: ${{ inputs.entry }}
+        run: |
+          set -euo pipefail
+          args=(--write)
+          if [ -n "${ENTRY:-}" ]; then args+=(--entry "$ENTRY"); fi
+          uv run --frozen scripts/tool_preview.py "${args[@]}" | tee "$RUNNER_TEMP/summary.txt"
+          # Only entry YAML may change.
+          if git status --porcelain | grep -v '^ M remotes/.*\.yaml$'; then
+            echo "::error::unexpected files changed"; exit 1
+          fi
+          {
+            echo 'summary<<EOF'
+            grep '^wrote' "$RUNNER_TEMP/summary.txt" || echo 'No changes.'
+            echo
+            grep '^LINT' "$RUNNER_TEMP/summary.txt" || echo 'Lint: no findings in the full live tool definitions.'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Validate
+        run: uv run --frozen scripts/validate.py
+
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.CATALOG_AUTOMATION_TOKEN || github.token }}
+          branch: automation/tool-preview-refresh
+          delete-branch: true
+          commit-message: "chore: refresh toolPreview from live tools/list"
+          title: "chore: refresh toolPreview from live tools/list"
+          body: |
+            Google's Workspace MCP servers (Developer Preview) changed their tool surface.
+            Legend: `+` added, `-` removed, `~` changed. `LINT` lines flag hidden characters or
+            injection-like phrases anywhere in the full live tool definitions.
+
+            ```
+            ${{ steps.refresh.outputs.summary }}
+            ```
+
+            Review new or changed tools before merging; consider `metadata.unsupportedTools` for anything destructive.

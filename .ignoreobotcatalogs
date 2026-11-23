@@ -1,0 +1,6 @@
+# Belt and braces: never parse tooling or docs as catalog entries.
+scripts
+docs
+icons
+schema
+tests

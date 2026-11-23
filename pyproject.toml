@@ -1,0 +1,22 @@
+[project]
+name = "mcp-catalog-tools"
+version = "0.1.0"
+description = "Validation and maintenance tooling for the dcode Obot MCP catalog"
+requires-python = ">=3.11"
+dependencies = [
+  "jsonschema>=4.23",
+  "pyyaml>=6.0.2",
+  "ruamel.yaml>=0.18.6",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

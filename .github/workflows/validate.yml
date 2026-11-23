@@ -1,0 +1,85 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  OBOT_VERSION: v0.28.2
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Whitespace
+        run: git diff --check "$(git hash-object -t tree /dev/null)" HEAD
+
+      - name: yamllint
+        run: uvx yamllint@1.35.1 --strict .
+
+      - name: Unit tests
+        run: uv run --frozen pytest
+
+      - name: Fetch Obot default catalog (display-name collision check)
+        run: git clone --depth 1 --quiet https://github.com/obot-platform/mcp-catalog "$RUNNER_TEMP/upstream-catalog"
+
+      - name: Validate entries and icons (downloads icon URLs)
+        run: uv run --frozen scripts/validate.py --network --print-ids --upstream "$RUNNER_TEMP/upstream-catalog"
+
+      - name: Install obot CLI ${{ env.OBOT_VERSION }}
+        id: obot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          asset="obot_${OBOT_VERSION}_linux_amd64.tar.gz"
+          sums="obot_${OBOT_VERSION#v}_checksums.txt"
+          dir="$RUNNER_TEMP/obot"
+          mkdir -p "$dir"
+          gh release download "$OBOT_VERSION" -R obot-platform/obot -D "$dir" -p "$asset" -p "$sums"
+          (cd "$dir" && sha256sum -c --ignore-missing "$sums")
+          tar -xzf "$dir/$asset" -C "$dir"
+          install -m 0755 "$(find "$dir" -type f -name obot | head -n1)" "$RUNNER_TEMP/obot-bin"
+
+      # The obot validator errors out when there are no entry files at all.
+      - name: obot mcp validate-catalog-yaml
+        if: hashFiles('remotes/*.yaml', 'vmcps/*.yaml') != ''
+        run: '"$RUNNER_TEMP/obot-bin" mcp validate-catalog-yaml --require-entry-key .'
+
+  # Google's Workspace MCP servers are in Developer Preview, so their tool lists
+  # change without notice. This job depends on Google's live endpoints and is
+  # deliberately NOT a required status check: upstream drift must not block
+  # unrelated PRs. When it fails, run the tool-preview-refresh workflow (or
+  # `uv run scripts/tool_preview.py --write`) and merge the resulting PR.
+  tool-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: toolPreview matches live tools/list (and lint full tool text)
+        run: uv run --frozen scripts/tool_preview.py --check
