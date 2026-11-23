@@ -1,0 +1,116 @@
+# Google Drive - Google's official Workspace MCP server (Developer Preview).
+# Display name intentionally differs from the upstream default catalog's "Google Drive"
+# (Obot derives the entry object name from the sanitized display name only).
+# serverUserType intentionally omitted: ignored by Obot v0.28.2 (removed by
+# `obot mcp convert-catalog`). Effective behavior is multiUser: a fixedURL remote with
+# no user config is shared, and each user authorizes Google with their own OAuth token
+# through a vMCP. No `config`, `env`, or `remoteConfig.headers` (OAuth only).
+# icon: byte-identical copy at icons/gws-drive.svg.
+# toolPreview: generated from the unauthenticated tools/list response of the endpoint.
+name: Google Drive (Google Workspace)
+entryKey: gws-drive
+shortDescription: Search, read, create, copy, and upload files in Google Drive with Google's official Workspace MCP server
+description: |
+  Search and list files in Google Drive, read file content (including comments on Docs, Sheets, and Slides), download files, inspect metadata and sharing permissions, and create, copy, or upload new revisions of files, all as your own Google account.
+
+  See Google's [Drive MCP server reference](https://developers.google.com/workspace/drive/api/reference/mcp), [Configure the Drive MCP server](https://developers.google.com/workspace/drive/api/guides/configure-mcp-server), and [Configure the Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers) for setup, authentication, and current capabilities.
+
+  ## Features
+
+  - **Find files**: structured search by title, full text, MIME type, owner, sharing, dates, folder, and more; list recently viewed or modified files.
+  - **Read content**: get a text representation of Docs, Sheets, Slides, PDFs, Office files, images, and video transcripts, optionally with inline comments.
+  - **Download and inspect**: download file content (with export formats for Google files), read metadata, and list sharing permissions.
+  - **Create and update**: create files, folders, and blank Docs, Sheets, or Slides; upload content; copy files; and upload new revisions of existing files.
+
+  ## What you'll need to connect
+
+  1. **Google Workspace Developer Preview.** The Drive MCP server is part of the [Google Workspace Developer Preview Program](https://developers.google.com/workspace/preview). The Google Cloud project behind the OAuth client must be enrolled.
+  2. **APIs and MCP services enabled** in that Google Cloud project: the Google Drive API (`drive.googleapis.com`) and the Drive MCP API (`drivemcp.googleapis.com`).
+  3. **A shared OAuth client configured by your Obot administrator.** Google's MCP servers do not support dynamic client registration, so an administrator creates one Google **Web application** OAuth client (marked as an AI-powered agent), adds `https://<your-obot-host>/oauth/mcp/callback` as an authorized redirect URI, and enters its client ID and secret on this entry in Obot.
+  4. **OAuth scopes** allowed on the OAuth consent screen (Data Access). Google's setup guide lists:
+     - `https://www.googleapis.com/auth/drive.readonly`
+     - `https://www.googleapis.com/auth/drive.file`
+
+     The server's protected-resource metadata also advertises `https://www.googleapis.com/auth/drive`, and Obot requests every advertised scope, so add it as well. An **Internal** consent screen for your Workspace organization avoids Google app verification for these restricted scopes.
+  5. **Sign in with Google.** When you connect, Google asks you to authorize Obot. Tool calls run as your Google identity with the scopes you grant; each user has their own token.
+
+  ## Notes
+
+  Google's Workspace MCP servers are in Developer Preview; tool names and behavior may change without notice. `upload_file_revision` replaces the content of an existing file (Google marks it destructive).
+metadata:
+  categories: Google Workspace,Productivity
+icon: https://upload.wikimedia.org/wikipedia/commons/5/5f/Google_Drive_icon_(2026).svg
+repoURL: https://developers.google.com/workspace/drive/api/reference/mcp
+runtime: remote
+remoteConfig:
+  fixedURL: https://drivemcp.googleapis.com/mcp/v1
+  staticOAuthRequired: true
+toolPreview:
+  - name: copy_file
+    description: Call this tool to copy an existing File in Google Drive. The tool allows specifying a new title and a parent folder for the copy. If the title is not specified, the copy title will be 'Copy of {original title}'.
+    params:
+      fileId: Required. The ID of the file to copy.
+      parentId: The parent id of the newly created file. If empty, the file will be created with the same parent as the original file.
+      pregeneratedId: Optional. The pregenerated id of the newly created file, obtained from the `generate_ids` tool. Supported for binary/blob files; not supported for native Google Workspace document types.
+      title: The title of the newly created file. If empty, the title will be 'Copy of {original file title}'.
+  - name: create_file
+    description: Call this tool to create or upload a File to Google Drive.
+    params:
+      base64Content: Optional. The base64 encoded content to upload. It's an error to set this and `textContent`.
+      content: 'Deprecated: Use `base64Content` or `textContent` instead. The content of the file encoded as base64. The content field should always be base64 encoded regardless of the mime type of the file.'
+      contentMimeType: The mime type of the content being uploaded. Required when any type of content is provided.
+      disableConversionToGoogleType: Set to true to retain the passed in content mime type and not convert to a Google type. For example, without this a `text/plain` content mime type will be converted to to `application/vnd.google-apps.document`. Has no effect for types that do not have a Google equivalent.
+      inheritedPermissionsDisabled: Set to true to disable inherited permissions on the created folder, restricting access to only users with direct permissions on the folder.
+      mimeType: 'Deprecated: DO NOT USE!! Set `contentMimeType` instead.'
+      parentId: The parent id of the file.
+      pregeneratedId: Optional. The pregenerated id of the file to create, obtained from the `generate_ids` tool. Supported for binary/blob files and folders (`application/vnd.google-apps.folder`); not supported for native Google Workspace document types. When uploading content with a pregenerated id, `disableConversionToGoogleType` must be set to true.
+      textContent: Optional. The (UTF-8) text content to upload. It's an error to set this and `base64Content`.
+      title: Required. The title of the file.
+  - name: download_file_content
+    description: Call this tool to download the content of a Drive file as a base64 encoded string.
+    params:
+      exportMimeType: Optional. For Google native files, the MIME type to export the file to, ignored otherwise. Defaults to text if not specified.
+      fileId: Required. The ID of the file to retrieve.
+      revisionId: Optional. The revision id for the version of the file to download. If not specified, the latest revision will be downloaded.
+  - name: get_file_metadata
+    description: Call this tool to find general metadata about a user's Drive file.
+    params:
+      excludeContentSnippets: If `true`, the content snippet will be excluded from the response. Must not be set to `true` if `snippetVerbosity` is specified.
+      fileId: Required. The ID of the file to retrieve.
+      includeRichMetadata: Optional. When true, also returns `owner_name`, `last_modifying_user_name`, `last_modifying_user_email`, `visibility`, and `last_commented_time`. Defaults to `false`.
+      snippetVerbosity: Optional. Set to specify how verbose the snippets should be. Defaults to `DETAILED` if not set. Must not be set if `excludeContentSnippets` is `true`.
+  - name: get_file_permissions
+    description: Call this tool to list the permissions of a Drive File.
+    params:
+      fileId: Required. The ID of the file to get permissions for.
+  - name: list_recent_files
+    description: Call this tool to find recent files for a user specified a sort order. Default sort order is `recency` if orderBy is not set or set to an unsupported value.
+    params:
+      excludeContentSnippets: If `true`, the content snippet will be excluded from the response. Must not be set to `true` if `snippetVerbosity` is specified.
+      orderBy: The sort order for the files.
+      pageSize: The maximum number of files to return.
+      pageToken: The page token to use for pagination.
+      snippetVerbosity: Optional. Set to specify how verbose the snippets should be. Defaults to `DETAILED` if not set. Must not be set if `excludeContentSnippets` is `true`.
+  - name: read_file_content
+    description: Call this tool to fetch a natural language representation of a known Drive file, and if specified, its comments.
+    params:
+      fileId: Required. The ID of the file to retrieve.
+      includeComments: 'Whether to include comments in the response. Set to true when the user asks about comments, feedback, action items, open questions, or discussion threads on the file, or before replying to or resolving a comment. Comments will be inlined in the text content of the file with a mapping to the comment threads. Note: Comments are only supported for Google Docs, Slides, and Sheets.'
+  - name: search_files
+    description: "Search for Drive files using a structured query (syntax: `query_term operator values`). Only terms in this list are supported. Combine clauses with `and`, `or`, `not`, and parentheses. String values must be single-quoted; escape embedded quotes as `\\'`."
+    params:
+      excludeContentSnippets: If `true`, the content snippet will be excluded from the response. Must not be set to `true` if `snippetVerbosity` is specified.
+      includeRichMetadata: Optional. When true, also returns `owner_name`, `last_modifying_user_name`, `last_modifying_user_email`, `visibility`, and `last_commented_time`. Defaults to `false`.
+      orderBy: 'Optional. The sort order for the search results. Specifies a single sort clause with syntax `<field> [asc|desc]`. Supported fields: - `modifiedTime` (defaults to `desc`) - `viewedByMeTime` (defaults to `desc`) Examples: `modifiedTime desc`, `viewedByMeTime`. If omitted or empty, results are ordered by relevance descending. Unsupported fields or invalid directions return an error.'
+      pageSize: The maximum number of files to return in each page.
+      pageToken: The page token to use for pagination.
+      query: The search query.
+      snippetVerbosity: Optional. Set to specify how verbose the snippets should be. Defaults to `DETAILED` if not set. Must not be set if `excludeContentSnippets` is `true`.
+  - name: upload_file_revision
+    description: Call this tool to upload a new content revision for an existing blob file in Google Drive.
+    params:
+      base64Content: Optional base64-encoded binary content to upload. Either base64Content or textContent must be set, but not both.
+      contentMimeType: Required. The MIME type of the content to upload.
+      etag: Optional. Opaque version token used for optimistic concurrency control (preventing concurrent edit conflicts). If set, the upload fails with FAILED_PRECONDITION if the file has been modified since the etag was returned. OMIT this field if you have not previously retrieved the file. Never fabricate or manually format an etag value.
+      fileId: Required. The ID of the file to update with a new revision.
+      textContent: Optional UTF-8 text content to upload. Either base64Content or textContent must be set, but not both.

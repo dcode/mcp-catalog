@@ -1,0 +1,57 @@
+# Display name must NOT equal the upstream default catalog's "Google Docs"
+# (the entry object name is a hash of the catalog and the sanitized display name).
+# serverUserType is intentionally omitted: Obot v0.28.2 ignores it, and
+# `obot mcp convert-catalog` removes it. Effective behavior is multiUser: a
+# fixedURL remote with no user config is shared through a vMCP, and each user
+# signs in to Google with their own OAuth token.
+name: Google Docs (Google Workspace)
+entryKey: gws-docs
+shortDescription: Read and edit Google Docs, including comments and structure, with Google's official Workspace MCP server
+description: |
+  Read Google Docs as structured JSON (text, formatting, tabs, and optionally comments) and update them with Docs API batch update requests: insert, replace, delete, and style text; add tables, images, headers, footers, footnotes, and tabs; and add or reply to comments and accept or reject suggestions, all using your own Google account.
+
+  See Google's [Google Docs MCP server reference](https://developers.google.com/workspace/docs/api/reference/mcp) and [Configure the Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers) for setup, authentication, and current capabilities.
+
+  ## What you'll need to connect
+
+  1. **Google Workspace Developer Preview access.** The Docs MCP server is available only through the [Google Workspace Developer Preview Program](https://developers.google.com/workspace/preview).
+  2. **A configured Google Cloud project (Obot administrator).** In the project that owns the OAuth client, enable the Google Docs API (`docs.googleapis.com`) and the Docs MCP API (`docsmcp.googleapis.com`). Docs IDs are shared with Drive, so most setups also enable the Drive API and Drive MCP API.
+  3. **OAuth scopes on the consent screen (Obot administrator).** Add these under Google Auth Platform > Data Access:
+     - `https://www.googleapis.com/auth/documents`
+     - `https://www.googleapis.com/auth/documents.readonly`
+     - `https://www.googleapis.com/auth/drive.readonly`
+     - `https://www.googleapis.com/auth/drive.file`
+     - `https://www.googleapis.com/auth/drive` (the server's OAuth metadata advertises this scope, so Obot requests it at sign-in)
+
+     An **Internal** consent screen avoids Google's app verification for restricted scopes.
+  4. **The shared OAuth client in Obot (Obot administrator).** This entry uses a static OAuth client because Google's MCP servers don't support dynamic client registration. The administrator creates one Google **Web application** OAuth client with the redirect URI `https://<your-obot-host>/oauth/mcp/callback` and enters its client ID and secret under **Configure OAuth Credentials** for this entry.
+  5. **Your Google sign-in.** When you connect, Google asks you to authorize Obot. Tool calls run as your Google identity, with the scopes you grant.
+
+  ## Tools
+
+  - **read_doc**: Get a document's full JSON representation, optionally with comments.
+  - **update_doc**: Apply `documents.batchUpdate` requests (text, formatting, tables, images, headers and footers, tabs, comments, and suggestions).
+
+  ## Notes
+
+  Google's Workspace MCP servers are in Developer Preview; tool names and behavior may change.
+metadata:
+  categories: Google Workspace,Productivity
+icon: https://upload.wikimedia.org/wikipedia/commons/1/18/Google_Docs_icon_%282026%29.svg
+repoURL: https://developers.google.com/workspace/docs/api/reference/mcp
+runtime: remote
+remoteConfig:
+  fixedURL: https://docsmcp.googleapis.com/mcp/v1
+  staticOAuthRequired: true
+toolPreview:
+  - name: read_doc
+    description: This tool retrieves a JSON representation of the Google Doc given its document ID.
+    params:
+      commentsIncluded: Optional. If true, comments will be included in the response. By default, comments are not included.
+      documentId: Required. The ID of the document to read. This is the same as file_id from Drive tools.
+  - name: update_doc
+    description: Updates a document using batch update requests. It accepts a `documents.batchUpdate` request (as JSON).
+    params:
+      documentId: Required. The ID of the document to update. This is the same as file_id from Drive tools.
+      requests: 'A list of updates to apply to the document. Each request should be a valid documents.batchUpdate Request object, using the schema documented in: https://developers.google.com/workspace/docs/api/reference/rest/v1/documents/request Requests will be applied in the order they are specified. If any request is not valid, no requests will be applied.'
+      writeControl: Optional. Provides control over how write requests are executed.

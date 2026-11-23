@@ -1,0 +1,70 @@
+# Display name must NOT collide with an entry in Obot's default catalog
+# (entry object name = hash of catalog + sanitized display name).
+# serverUserType intentionally omitted: the field no longer exists in Obot v0.28.2
+# (ignored on sync, removed by `obot mcp convert-catalog`). A fixedURL remote with no
+# user config is shared, and each user authorizes Google with their own OAuth token
+# through a vMCP (effective behavior: multiUser).
+name: Google Slides (Google Workspace)
+entryKey: gws-slides
+shortDescription: Read, inspect, thumbnail, and edit Google Slides presentations with Google's official Workspace MCP server
+description: |
+  Read Google Slides presentations and individual slides as structured JSON, render slide thumbnails, and edit decks with Slides API batch updates: add slides, shapes, tables, images, and charts, replace text, restyle content, and manage comments. Everything runs as your own Google account.
+
+  See Google's [Google Slides MCP server reference](https://developers.google.com/workspace/slides/api/reference/mcp) and [Configure the Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers) for setup, authentication, and current capabilities.
+
+  ## What you'll need to connect
+
+  1. **Shared OAuth client (configured by your Obot administrator).** This entry uses Google OAuth only. An administrator creates one Google Cloud **Web application** OAuth client with **Use this client for an AI-powered agent** selected, adds the redirect URI `https://<your-obot-host>/oauth/mcp/callback`, and saves the client ID and secret on this entry in Obot. All Google Workspace entries in this catalog share that client.
+  2. **Google Workspace Developer Preview.** The Workspace MCP servers are available only through the [Google Workspace Developer Preview Program](https://developers.google.com/workspace/preview). The Google Cloud project that owns the OAuth client must be enrolled.
+  3. **APIs and MCP services enabled** in that Google Cloud project:
+     - Google Slides API: `slides.googleapis.com`
+     - Google Slides MCP API: `slidesmcp.googleapis.com`
+  4. **OAuth scopes** added under Google Auth Platform > Data Access. Google lists these for the Slides MCP server:
+     - `https://www.googleapis.com/auth/drive.readonly`
+     - `https://www.googleapis.com/auth/drive.file`
+     - `https://www.googleapis.com/auth/presentations.readonly`
+     - `https://www.googleapis.com/auth/presentations`
+
+     The server's protected-resource metadata also advertises `https://www.googleapis.com/auth/drive`, and Obot requests the scopes the server advertises, so add that scope too. An **Internal** consent screen avoids Google app verification for users in your Workspace organization.
+  5. **Your consent.** When you first connect, Google asks you to authorize Obot. Tool calls run as your Google identity with the scopes you grant.
+
+  ## Notes
+
+  - Google's Workspace MCP servers are in **Developer Preview**. Tool names, parameters, and behavior may change without notice.
+  - `update_presentation` can change or delete content in your presentations. Its `requests` parameter uses the [Slides API batchUpdate request format](https://developers.google.com/workspace/slides/api/reference/rest/v1/presentations/request).
+metadata:
+  categories: Google Workspace,Productivity
+icon: https://upload.wikimedia.org/wikipedia/commons/4/4f/Google_Slides_icon_%282026%29.svg # byte-identical copy at icons/gws-slides.svg
+repoURL: https://developers.google.com/workspace/slides/api/reference/mcp
+runtime: remote
+remoteConfig:
+  fixedURL: https://slidesmcp.googleapis.com/mcp/v1
+  staticOAuthRequired: true
+# toolPreview generated from the unauthenticated tools/list response of
+# https://slidesmcp.googleapis.com/mcp/v1 (fetched 2026-11-22).
+toolPreview:
+  - name: read_presentation
+    description: Read a JSON representation of a Google Slides presentation.
+    params:
+      commentsIncluded: Optional. If true, comments will be included in the response. By default, comments are not included.
+      fields: Optional. A field mask specifying which subset of properties to return. Paths MUST accurately match the Google Slides REST API JSON resource structure (e.g. Presentation, Page, PageElement, Shape, Image, Table, Line, Video, TextContent).
+      presentationId: Required. The ID of the presentation to read content from.
+  - name: read_slide_page
+    description: Read a JSON representation of a single slide/page from a Google Slides presentation.
+    params:
+      commentsIncluded: Optional. If true, comments will be included in the response. By default, comments are not included.
+      fields: Optional. A field mask specifying which subset of properties to return for the slide page. Paths MUST accurately match the Google Slides REST API resource structure (e.g. Page, PageElement, Shape, Image, Table, Line, Video, TextContent).
+      pageId: Required. The ID of the slide page to retrieve.
+      presentationId: Required. The ID of the presentation containing the page.
+  - name: read_slide_page_thumbnail
+    description: Reads a thumbnail representation of a single slide page in a presentation, returning the thumbnail image URL along with its width and height dimensions.
+    params:
+      pageId: Required. The ID of the slide page to retrieve a thumbnail for.
+      presentationId: Required. The ID of the presentation containing the page to retrieve a thumbnail for.
+      thumbnailProperties: Optional. The optional properties of the thumbnail image to be returned.
+  - name: update_presentation
+    description: Updates a presentation with set of batchUpdate requests.
+    params:
+      presentationId: Required. The ID of the presentation to update.
+      requests: Required. A list of batchUpdate requests, using the schema and semantics documented at https://developers.google.com/workspace/slides/api/reference/rest/v1/presentations/request
+      writeControl: Optional. Provides control over how write requests are executed.

@@ -1,0 +1,59 @@
+# Display name must NOT equal any upstream default-catalog name (entry object
+# name = hash of catalog + sanitized display name).
+name: Google People (Google Workspace)
+entryKey: gws-people
+shortDescription: Look up your Google contacts, your organization's Workspace directory, and your own profile with Google's official People MCP server
+description: |
+  Search your personal Google contacts, look up colleagues in your organization's Google Workspace directory, and read your own profile name and email. All tools are read-only.
+
+  See Google's [People API MCP server reference](https://developers.google.com/people/api/mcp), [Configure the People API MCP server](https://developers.google.com/people/v1/configure-mcp-server), and [Configure the Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers) for setup, authentication, and current capabilities.
+
+  ## What you can do
+
+  - **Search the Workspace directory**: find people in your organization by name or email (Google Workspace accounts only; not available for personal Google accounts).
+  - **Search your contacts**: find people saved in your own Google Contacts.
+  - **Get your profile**: return your own name and email address.
+
+  ## What you'll need to connect
+
+  1. **Google Workspace Developer Preview**: the Google Cloud project behind the OAuth client must be enrolled in the [Google Workspace Developer Preview Program](https://developers.google.com/workspace/preview).
+  2. **Enabled service**: unlike the other Workspace MCP servers, People serves MCP directly on `people.googleapis.com`, so only the **People API** (`people.googleapis.com`) needs to be enabled in that project.
+  3. **OAuth scopes**: the OAuth consent screen (Data Access) must allow:
+     - `https://www.googleapis.com/auth/directory.readonly`
+     - `https://www.googleapis.com/auth/userinfo.profile`
+     - `https://www.googleapis.com/auth/contacts.readonly`
+  4. **Shared OAuth client**: your Obot administrator configures the shared Google Web OAuth client (application type set as an AI-powered agent, redirect URI `https://<your-obot-host>/oauth/mcp/callback`) for this entry. Google does not support dynamic client registration for these servers.
+  5. When you connect, Google asks you to authorize Obot. Tool calls run as your own Google identity with the scopes you grant.
+
+  ## Notes
+
+  Google's Workspace MCP servers are in **Developer Preview**; tool names and behavior may change. Directory search requires a Google Workspace account and returns no results for personal Google accounts.
+metadata:
+  categories: Google Workspace,Productivity
+# Wikimedia Commons "Google Contacts logo (2026).png" (no 2026 SVG exists on Commons);
+# byte-identical local copy at icons/gws-people.png
+icon: https://upload.wikimedia.org/wikipedia/commons/7/7e/Google_Contacts_logo_%282026%29.png
+repoURL: https://developers.google.com/people/api/mcp
+runtime: remote
+remoteConfig:
+  fixedURL: https://people.googleapis.com/mcp/v1
+  staticOAuthRequired: true
+# serverUserType intentionally omitted: ignored by Obot v0.28.2 (removed by
+# `obot mcp convert-catalog`). Effective behavior is multiUser: a fixedURL remote
+# with no user config is shared, with per-user Google OAuth tokens via vMCP.
+# toolPreview generated from unauthenticated tools/list on https://people.googleapis.com/mcp/v1
+toolPreview:
+  - name: search_directory_people
+    description: Search for people within your organization's Google Workspace directory. This feature is exclusively for Google Workspace accounts (used by businesses, schools, and other organizations) and is not available for personal Google accounts.
+    params:
+      pageSize: Page size. The default is 10 and the maximum allowed value is 500.
+      pageToken: Page token.
+      query: Query string to search for.
+      sources: Directory sources to return. Defaults to DOMAIN_PROFILE if not set.
+  - name: search_contacts
+    description: Search user's contacts.
+    params:
+      maxResults: Max number of results. The default is 10 and the maximum allowed value is 30.
+      query: Query string to search for.
+  - name: get_user_profile
+    description: Get profile info about yourself (name and email).
