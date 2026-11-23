@@ -1,0 +1,168 @@
+# Gmail entry for Google's official Google Workspace MCP server (Developer Preview).
+# The display name must differ from the upstream default catalog's "Gmail" entry:
+# Obot derives the entry object ID from the catalog and the sanitized display name only.
+# serverUserType is intentionally omitted. Obot v0.28.2 ignores it, and
+# `obot mcp convert-catalog` removes it. A fixedURL remote with no user config is
+# shared (effectively multiUser): each user signs in to Google with their own OAuth token.
+# toolPreview is generated from the unauthenticated tools/list response of the endpoint.
+name: Gmail (Google Workspace)
+entryKey: gws-gmail
+shortDescription: Search, read, draft, label, and triage Gmail messages and threads with Google's official Workspace MCP server.
+description: |
+  Search and read Gmail threads and messages, create and list drafts, create and apply labels, and move mail to or from Trash and Spam, all as your own Google account.
+
+  See Google's [Gmail MCP server reference](https://developers.google.com/workspace/gmail/api/reference/mcp), [Configure the Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server), and [Configure the Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers) for setup, authentication, and current capabilities.
+
+  ## What you'll need to connect
+
+  1. **A configured OAuth client.** Your Obot administrator sets up one shared Google **Web application** OAuth client for this entry. The client must have **Use this client for an AI-powered agent** selected in Google Auth Platform > Clients, and its authorized redirect URI must be Obot's MCP OAuth callback (`https://<your-obot-host>/oauth/mcp/callback`). Google's Workspace MCP servers do not support dynamic client registration.
+  2. **Google Workspace Developer Preview.** The Google Cloud project that owns the OAuth client must be enrolled in the [Google Workspace Developer Preview Program](https://developers.google.com/workspace/preview).
+  3. **APIs and MCP services.** The project must have the **Gmail API** (`gmail.googleapis.com`) and the **Gmail MCP API** (`gmailmcp.googleapis.com`) enabled.
+  4. **OAuth scopes.** The OAuth consent screen (Google Auth Platform > Data Access) must include the scopes Google lists for Gmail:
+     - `https://www.googleapis.com/auth/gmail.readonly`
+     - `https://www.googleapis.com/auth/gmail.compose`
+     - `https://www.googleapis.com/auth/gmail.modify`
+
+     Obot discovers scopes from the server's OAuth protected-resource metadata, which advertises a broader Gmail scope set (including `https://mail.google.com/`). An **Internal** consent screen in your Workspace organization avoids app verification for these restricted scopes.
+  5. **Sign in.** When you connect, Google asks you to authorize Obot. Every tool call runs as your Google identity with the scopes you grant. Each user signs in separately; no mailbox is shared.
+
+  ## Capabilities
+
+  - **Search and read**: find threads with Gmail search operators, then read full threads or single messages in plain text, HTML, metadata-only, or raw MIME form.
+  - **Drafts**: create plain-text or HTML drafts (optionally as replies, with attachments and your signature), then list and fetch them. The server creates drafts only; it does not send mail.
+  - **Labels**: list and create labels (including nested labels), and add or remove labels on threads and messages to archive, mark read, star, or recategorize mail.
+  - **Trash and Spam**: move threads or messages to Trash (soft delete) or Spam, and restore them.
+
+  ## Notes
+
+  Google's Workspace MCP servers are in Developer Preview. Tool names, parameters, and behavior may change without notice.
+metadata:
+  categories: Google Workspace,Productivity,Communication
+icon: https://upload.wikimedia.org/wikipedia/commons/8/8f/Gmail_icon_%282026%29.svg
+repoURL: https://developers.google.com/workspace/gmail/api/reference/mcp
+runtime: remote
+remoteConfig:
+  fixedURL: https://gmailmcp.googleapis.com/mcp/v1
+  staticOAuthRequired: true
+toolPreview:
+  - name: create_draft
+    description: Creates a new draft email in the authenticated user's Gmail account.
+    params:
+      attachments: Optional. The attachments to include in the email. The combined size of attachments in the message cannot exceed 25MB. If you need to send files larger than 25MB, upload the file to Drive first and then insert the Drive link into `body` or `htmlBody`.
+      bcc: Optional. The blind carbon copy recipients of the email draft. Each string MUST be a valid plain email address (e.g., "user@example.com").
+      body: Optional. The plain text body content of the email draft. Do NOT format this field with Markdown (such as headers `#`, bold `**`, bullet points `*`, or tables `|`). If formatted rich text is desired, use `htmlBody` instead. If `htmlBody` is also provided, this field is treated as the plain-text alternative.
+      cc: Optional. The carbon copy recipients of the email draft. Each string MUST be a valid plain email address (e.g., "user@example.com").
+      htmlBody: Optional. The HTML content of the email draft. If provided, this will be used as the rich-text version of the email. Use this field (with valid HTML tags such as `p`, `b`, `ul`, `li`, `h1`) whenever rich text formatting is needed.
+      includeSignature: Optional. Whether to append the user's configured Gmail web signature to the draft. Defaults to false.
+      replyToMessageId: Optional. The ID of the message to reply to. If provided, this will be used as the reply-to message ID for the email draft, and the `body` and `htmlBody` will be appended to the original message body.
+      subject: Optional. The subject line of the email. Defaults to empty if not provided.
+      to: Optional. The primary recipients of the email draft. Each string MUST be a valid plain email address (e.g., "user@example.com").
+  - name: list_drafts
+    description: Lists draft emails from the authenticated user's Gmail account, optionally filtered by a query string.
+    params:
+      pageSize: Optional. The maximum number of drafts to return. If unspecified, defaults to 20. The maximum allowed value is 50.
+      pageToken: Optional. A token received from a previous `list_drafts` call to retrieve the next page of results. Leave empty to fetch the first page. This is primarily used for pagination to continue fetching results from where the previous `ListDraft` call left off, especially when the number of drafts matching the query exceeds the `pageSize` limit.
+      query: Optional. A query string to filter the drafts. Natural language queries must be pre-converted into Gmail compatible syntax queries to use this tool. If omitted, all drafts (excluding spam and trash by default) are listed. The tool inherently only searches for drafts.
+      view: Optional. Controls the fields populated for drafts in the draft list. Defaults to returning metadata only (`id`, `threadId`, `toRecipients`, `ccRecipients`, `bccRecipients`, `date`). Set to `DRAFT_VIEW_FULL` to include `subject` and `plaintextBody` content.
+  - name: get_draft
+    description: Retrieves a specific draft email from the authenticated user's Gmail account by ID, including its `viewUrl` for viewing and editing in the Gmail Web UI.
+    params:
+      draftId: Required. The unique identifier of the draft to fetch.
+      messageFormat: Optional. Specifies the format of the draft returned. Defaults to `PLAIN_TEXT`.
+  - name: get_thread
+    description: Retrieves a specific email thread from the authenticated user's Gmail account, including its `viewUrl` and a list of its messages (each with their own `viewUrl`).
+    params:
+      messageFormat: 'Optional. Specifies the format of the messages returned within the thread. Defaults to `PLAIN_TEXT`. Use `FULL_CONTENT` only when the HTML body is needed. Note: `MINIMAL` format returns `id`, `snippet`, `subject`, `sender`, `toRecipients`, `ccRecipients`, `bccRecipients`, `date`, `labelIds`, `viewUrl` (if applicable).'
+      threadId: Required. The unique identifier of the thread to fetch.
+  - name: get_message
+    description: Retrieves a specific email message from the authenticated user's Gmail account by its unique message ID, including its `viewUrl`.
+    params:
+      messageFormat: Optional. Specifies the format of the message returned. Defaults to `PLAIN_TEXT`. Use `FULL_CONTENT` only when the HTML body is needed.
+      messageId: Required. The unique identifier of the message to fetch.
+  - name: search_threads
+    description: Lists email threads from the authenticated user's Gmail account.
+    params:
+      includeTrash: Optional. Include threads from TRASH in the results. Defaults to false.
+      pageSize: Optional. The maximum number of threads to return. If unspecified, defaults to 20. The maximum allowed value is 50.
+      pageToken: Optional. Page token to retrieve a specific page of results in the list. Leave empty to fetch the first page. This is primarily used for pagination to continue fetching results from where the previous `SearchThreads` call left off, especially when the number of threads matching the query exceeds the `pageSize` limit.
+      query: Optional. A query string to filter the threads. Natural language queries must be pre-converted into Gmail syntax queries to use this tool. If omitted, all threads (excluding spam and trash by default) are listed.
+      view: Optional. Controls the fields populated for threads in the thread list. Defaults to `THREAD_VIEW_MINIMAL`. `THREAD_VIEW_MINIMAL` returns `id`, `snippet`, `subject`, `sender`, `toRecipients`, `ccRecipients`, `bccRecipients`, `date`, `labelIds`, `viewUrl` (if applicable).
+  - name: label_thread
+    description: Adds labels to an entire thread in the authenticated user's Gmail account. This operation affects all messages currently in the thread and any future messages added to it.
+    params:
+      labelIds: Required. The unique identifiers of the labels to add. Can be a system label ID (e.g., `INBOX`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. The tool accepts `labelIds` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.
+      threadId: Required. The unique identifier of the thread to add labels to.
+  - name: unlabel_thread
+    description: Removes labels from an entire thread in the authenticated user's Gmail account. This operation affects all messages currently in the thread.
+    params:
+      labelIds: Required. The unique identifiers of the labels to remove. Can be a system label ID (e.g., `INBOX`, `TRASH`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. `SPAM` cannot be removed with this tool. The tool accepts `labelIds` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.
+      threadId: Required. The unique identifier of the thread to remove labels from.
+  - name: apply_sensitive_thread_label
+    description: Prefer `trash_thread` or `mark_thread_spam` instead.
+    params:
+      labelOption: Required. The sensitive label option to add.
+      threadId: Required. The ID of the thread to add the label to.
+  - name: trash_thread
+    description: Moves an entire thread to the Trash (soft delete) in the authenticated user's Gmail account. This operation affects all messages currently in the thread.
+    params:
+      threadId: Required. The ID of the thread to move to Trash.
+  - name: untrash_thread
+    description: Removes an entire thread from the Trash in the authenticated user's Gmail account. This does not return the thread to the Inbox; to move it to the Inbox, add the `INBOX` label separately.
+    params:
+      threadId: Required. The ID of the thread to remove from Trash.
+  - name: mark_thread_spam
+    description: Marks an entire thread as Spam in the authenticated user's Gmail account. This operation affects all messages currently in the thread.
+    params:
+      threadId: Required. The ID of the thread to mark as Spam.
+  - name: unmark_thread_spam
+    description: Unmarks an entire thread as Spam in the authenticated user's Gmail account. This does not return the thread to the Inbox; to move it to the Inbox, add the `INBOX` label separately.
+    params:
+      threadId: Required. The ID of the thread to unmark as Spam.
+  - name: list_labels
+    description: "Lists all labels available in the authenticated user's Gmail account. Use this tool to discover the `labelId` and display `name` of each label in `labels` before calling `label_thread`, `unlabel_thread`, `label_message`, or `unlabel_message`. Note: the system labels, `DRAFT` and `SENT`, cannot be set on messages and are read only."
+  - name: label_message
+    description: Adds one or more labels to a specific message in the authenticated user's Gmail account.
+    params:
+      labelIds: Required. The IDs of the labels to add. Can be a system label ID (e.g., `INBOX`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. The tool accepts `labelIds` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.
+      messageId: Required. The ID of the message to add the labels to.
+  - name: update_message_labels
+    description: Atomically adds and/or removes labels from a specific message in the authenticated user's Gmail account.
+    params:
+      addLabelIds: Optional. The IDs of the labels to add. Can be a system label ID (e.g., `INBOX`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID.
+      messageId: Required. The ID of the message to modify labels for.
+      removeLabelIds: Optional. The IDs of the labels to remove. Can be a system label ID or a user-defined label ID.
+  - name: unlabel_message
+    description: Removes one or more labels from a specific message in the authenticated user's Gmail account. To find the message ID, use the `get_thread` tool. If unsure of a user label's ID, use the `list_labels` tool first to discover available labels and their IDs.
+    params:
+      labelIds: Required. The IDs of the labels to remove. Can be a system label ID (e.g., `INBOX`, `TRASH`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. `SPAM` cannot be removed with this tool. The tool accepts `labelIds` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.
+      messageId: Required. The ID of the message to remove the labels from.
+  - name: apply_sensitive_message_label
+    description: Prefer `trash_message` or `mark_message_spam` instead.
+    params:
+      labelOption: Required. The sensitive label option to add.
+      messageId: Required. The ID of the message to add the label to.
+  - name: trash_message
+    description: Moves a specific message to the Trash (soft delete) in the authenticated user's Gmail account.
+    params:
+      messageId: Required. The ID of the message to move to Trash.
+  - name: untrash_message
+    description: Removes a specific message from the Trash in the authenticated user's Gmail account. This does not return the message to the Inbox; to move it to the Inbox, add the `INBOX` label separately.
+    params:
+      messageId: Required. The ID of the message to remove from Trash.
+  - name: mark_message_spam
+    description: Marks a specific message as Spam in the authenticated user's Gmail account.
+    params:
+      messageId: Required. The ID of the message to mark as Spam.
+  - name: unmark_message_spam
+    description: Unmarks a specific message as Spam in the authenticated user's Gmail account. This does not return the message to the Inbox; to move it to the Inbox, add the `INBOX` label separately.
+    params:
+      messageId: Required. The ID of the message to unmark as Spam.
+  - name: create_label
+    description: Creates a new label in the authenticated user's Gmail account. Supports creating nested labels (sub-labels) using a forward slash (e.g., 'Projects/Alpha/Sprint-1'). By default, parent labels will be automatically created if they do not exist.
+    params:
+      autoCreateParentLabels: Optional. Whether to automatically create parent labels for nested labels (separated by `/`). Defaults to `true`. When set to `true`, missing parent labels in the hierarchy (e.g., `Projects` and `Projects/Alpha` for `Projects/Alpha/Sprint-1`) are created automatically. When set to `false`, parent label auto-creation is disabled.
+      color: 'Deprecated: Do not use. Use `colorPreset` instead. Legacy field for raw text and background color hex strings.'
+      colorPreset: Optional. The color preset tile to assign to the new label. Select from predefined contrast-safe color options (e.g., LABEL_COLOR_PRESET_RED, LABEL_COLOR_PRESET_BLUE, LABEL_COLOR_PRESET_BLACK, LABEL_COLOR_PRESET_GREEN). If omitted, default label styling is applied.
+      displayName: Required. The display name of the label to create. Supports nested label hierarchy using `/` (e.g., `Projects/Alpha/Sprint-1`).
+      labelListVisibility: Optional. The visibility of the label in the label list in the Gmail web interface. Defaults to `LABEL_SHOW`.
+      messageListVisibility: Optional. The visibility of messages with this label in the message list in the Gmail web interface. Defaults to `SHOW`.

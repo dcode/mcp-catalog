@@ -1,0 +1,82 @@
+# Display name intentionally differs from the upstream default catalog's "Google Sheets":
+# the entry object name is derived from the sanitized display name, so identical names collide.
+# serverUserType is intentionally omitted: Obot v0.28.2 ignores it (and `obot mcp convert-catalog`
+# removes it). Effective behavior is multiUser: a fixedURL remote with no user config is shared,
+# and each user authorizes Google with their own OAuth token through a vMCP.
+name: Google Sheets (Google Workspace)
+entryKey: gws-sheets
+shortDescription: Read, write, and restructure Google Sheets spreadsheets with Google's official Workspace MCP server
+description: |
+  Read cell values and spreadsheet metadata, write values and formulas to ranges, insert rows or columns, and apply batch updates such as adding sheets or changing properties, all as your own Google account.
+
+  See Google's [Sheets MCP server reference](https://developers.google.com/workspace/sheets/api/reference/mcp) and [Configure the Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers) for setup, authentication, and current capabilities.
+
+  ## What you'll need to connect
+
+  1. **Shared OAuth client (admin):** Your Obot administrator configures this entry with the organization's shared Google **Web application** OAuth client (authorized redirect URI `https://<your-obot-host>/oauth/mcp/callback`). Google's Workspace MCP servers do not support dynamic client registration, so individual users do not create their own client.
+  2. **Google Workspace Developer Preview:** The Google Cloud project that owns the OAuth client must be enrolled in the [Google Workspace Developer Preview Program](https://developers.google.com/workspace/preview).
+  3. **APIs and MCP services enabled** in that project:
+     - Google Sheets API (`sheets.googleapis.com`)
+     - Google Drive API (`drive.googleapis.com`)
+     - Sheets MCP API (`sheetsmcp.googleapis.com`)
+  4. **OAuth scopes** added to the consent screen's Data Access page:
+     - `https://www.googleapis.com/auth/spreadsheets.readonly`
+     - `https://www.googleapis.com/auth/spreadsheets`
+     - `https://www.googleapis.com/auth/drive.readonly`
+     - `https://www.googleapis.com/auth/drive.file`
+
+     The server's protected-resource metadata also advertises `https://www.googleapis.com/auth/drive`, so add it too if Google requests it during consent.
+  5. **Sign in:** When you connect, Google asks you to authorize Obot. Tool calls run as your Google identity and can only reach spreadsheets your account can access.
+
+  ## Notes
+
+  Google's Workspace MCP servers are in Developer Preview; tool names and behavior may change. `update_spreadsheet` accepts any `spreadsheets.batchUpdate` request, including deleting sheets, ranges, and rows.
+metadata:
+  categories: Google Workspace,Productivity
+icon: https://upload.wikimedia.org/wikipedia/commons/8/86/Google_Sheets_icon_%28August_2026%29.svg
+repoURL: https://developers.google.com/workspace/sheets/api/reference/mcp
+runtime: remote
+remoteConfig:
+  fixedURL: https://sheetsmcp.googleapis.com/mcp/v1
+  staticOAuthRequired: true
+toolPreview:
+  - name: get_values
+    description: Returns a range of values from a spreadsheet.
+    params:
+      range: Required. The [A1 notation or R1C1 notation](https://developers.google.com/workspace/sheets/api/guides/concepts) of the range to retrieve values from.
+      spreadsheetId: Required. The ID of the spreadsheet to retrieve data from.
+  - name: get_spreadsheet
+    description: Returns the spreadsheet content for the given spreadsheet. Returns titles, sheet names, grid properties, and other metadata for the given spreadsheet ID. Also returns full grid data if requested.
+    params:
+      commentsIncluded: Optional. If true, comments will be included in the response. By default, comments are not included.
+      fields: Optional. A field mask to specify which properties to return of the Spreadsheets API, see https://developers.google.com/workspace/sheets/api/guides/field-masks for more on how to use the field masks.
+      includeGridData: True if grid data should be returned.
+      ranges: Optional. The [A1 notation or R1C1 notation](https://developers.google.com/workspace/sheets/api/guides/concepts) of the ranges to retrieve from the spreadsheet. If not specified, the entire spreadsheet is returned.
+      spreadsheetId: Required. The ID of the spreadsheet to request.
+  - name: update_spreadsheet
+    description: Applies one or more updates to the spreadsheet.
+    params:
+      requests: 'Required. A list of updates to apply to the spreadsheet. Each request should be a valid spreadsheets.batchUpdate Request object, using the schema documented in: https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/request Requests will be applied in the order they are specified. If any request is not valid, no requests will be applied.'
+      spreadsheetId: Required. The ID of the spreadsheet to update.
+      writeControl: Optional. Provides control over how write requests are executed.
+  - name: update_values
+    description: Sets values in a range of a spreadsheet.
+    params:
+      range: Required. The [A1 notation](https://developers.google.com/workspace/sheets/api/guides/concepts.md.txt) of the values to update.
+      spreadsheetId: Required. The ID of the spreadsheet to update.
+      values: 'Required. The data that was read or to be written. This is an array of arrays, the outer array representing all the data and each inner array representing a row. Each item in the inner array corresponds with one cell. Supported value types are: bool, string, and double. Null values will be skipped. To set a cell to an empty value, set the string value to an empty string.'
+  - name: update_formulas
+    description: Sets formulas in a range of a spreadsheet.
+    params:
+      formulas: 'Required. The data that was read or to be written. This is an array of arrays, the outer array representing all the data and each inner array representing a row. Each item in the inner array corresponds with one cell. Supported value types are: bool, string, and double. Null values will be skipped. To set a cell to an empty value, set the string value to an empty string.'
+      range: Required. The [A1 notation](https://developers.google.com/workspace/sheets/api/guides/concepts.md.txt) of the values to update.
+      spreadsheetId: Required. The ID of the spreadsheet to update.
+  - name: insert_dimension
+    description: Inserts rows or columns in a sheet at a particular index.
+    params:
+      dimension: Required. The dimension to insert.
+      endIndex: Required. The 0-based end index of the insertion (exclusive).
+      inheritFromBefore: Whether dimension properties should be extended from the dimensions before or after the newly inserted dimensions. True to inherit from the dimensions before (in which case the start index must be greater than 0), and false to inherit from the dimensions after.
+      sheetId: Required. The ID of the sheet to insert into.
+      spreadsheetId: Required. The ID of the spreadsheet to update.
+      startIndex: Required. The 0-based start index of the insertion (inclusive).

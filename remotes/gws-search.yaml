@@ -1,0 +1,57 @@
+# Universal Search entry for Google's official Google Workspace MCP servers (Developer Preview).
+# The display name must not collide with any other catalog entry name: Obot derives the
+# entry object ID from the catalog and the sanitized display name only.
+# serverUserType is intentionally omitted. Obot v0.28.2 ignores it, and
+# `obot mcp convert-catalog` removes it. A fixedURL remote with no user config is
+# shared (effectively multiUser): each user signs in to Google with their own OAuth token.
+# toolPreview is generated from the unauthenticated tools/list response of the endpoint.
+# Icon: Commons has no "(2026)"-titled Google "G"; this is the current gradient "G"
+# (Google_Favicon_2025.svg, 2025-present). Byte-identical copy at icons/gws-search.svg.
+name: Google Workspace Search
+entryKey: gws-search
+shortDescription: Search Gmail, Drive, Calendar, and Chat at once with Google's official Universal Search MCP server for Google Workspace.
+description: |
+  Run one query across your Gmail messages, Google Drive files, Google Calendar events, and Google Chat spaces and messages, and get matching results from every product you have authorized, all as your own Google account.
+
+  See Google's [Universal Search MCP reference](https://developers.google.com/workspace/reference/mcp), [Configure the Universal Search MCP server](https://developers.google.com/workspace/guides/universal-search-mcp), and [Configure the Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers) for setup, authentication, and current capabilities.
+
+  ## What you'll need to connect
+
+  1. **A configured OAuth client.** Your Obot administrator sets up one shared Google **Web application** OAuth client for this entry. The client must have **Use this client for an AI-powered agent** selected in Google Auth Platform > Clients, and its authorized redirect URI must be Obot's MCP OAuth callback (`https://<your-obot-host>/oauth/mcp/callback`). Google's Workspace MCP servers do not support dynamic client registration.
+  2. **Google Workspace Developer Preview.** The Google Cloud project that owns the OAuth client must be enrolled in the [Google Workspace Developer Preview Program](https://developers.google.com/workspace/preview).
+  3. **APIs and MCP services.** The project must have the **Google Workspace MCP API** (`workspacemcp.googleapis.com`) enabled. Universal Search does not require a separate product API.
+  4. **OAuth scopes.** The OAuth consent screen (Google Auth Platform > Data Access) must include the scopes Google lists for Universal Search:
+     - `https://www.googleapis.com/auth/gmail.readonly`
+     - `https://www.googleapis.com/auth/drive.readonly`
+     - `https://www.googleapis.com/auth/calendar.readonly`
+     - `https://www.googleapis.com/auth/chat.messages.readonly`
+     - `https://www.googleapis.com/auth/chat.spaces.readonly`
+     - `https://www.googleapis.com/auth/chat.memberships.readonly`
+
+     Search covers only the products whose scopes you grant. For example, without `gmail.readonly` no Gmail results are returned. Without `chat.spaces.readonly` and `chat.memberships.readonly`, Chat results are treated as externally shared and may be filtered out. Obot discovers scopes from the server's OAuth protected-resource metadata, which advertises a broader set (including `https://mail.google.com/` and full Drive, Calendar, and Chat scopes). An **Internal** consent screen in your Workspace organization avoids app verification for these restricted scopes.
+  5. **Sign in.** When you connect, Google asks you to authorize Obot. Every search runs as your Google identity with the scopes you grant. Each user signs in separately; no data is shared between users.
+
+  ## Capabilities
+
+  - **Cross-product search**: one `search_corpus` call fans out to Gmail, Drive, Calendar, and Chat and returns matching messages, files, events, and conversations. Gmail attachment details appear inside the message snippet.
+  - **Read-only**: the server only searches; it does not create, change, or delete anything. Use the product-specific Google Workspace entries to read full content or make changes.
+  - **Limits**: the server returns up to a server-defined number of results and does not support pagination.
+
+  ## Notes
+
+  Google's Workspace MCP servers are in Developer Preview. Tool names, parameters, and behavior may change without notice.
+metadata:
+  categories: Google Workspace,Productivity
+icon: https://upload.wikimedia.org/wikipedia/commons/3/3c/Google_Favicon_2025.svg
+repoURL: https://developers.google.com/workspace/reference/mcp
+runtime: remote
+remoteConfig:
+  fixedURL: https://workspacemcp.googleapis.com/mcp/v1
+  staticOAuthRequired: true
+toolPreview:
+  - name: search_corpus
+    description: Performs a search across multiple Workspace corpora (Drive, Gmail, Calendar, and Chat) based on the provided query.
+    params:
+      pageSize: Optional. Currently ignored. The server returns up to a server-defined number of results. Pagination isn't supported.
+      pageToken: Optional. Currently ignored. Pagination isn't supported.
+      query: Required. The raw query string provided by the user.

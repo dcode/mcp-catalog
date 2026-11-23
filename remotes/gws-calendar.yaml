@@ -1,0 +1,154 @@
+# Display name must not equal the upstream default catalog's "Google Calendar":
+# the entry object name is a hash of the catalog and the sanitized display name.
+# serverUserType is intentionally omitted: Obot v0.28.2 ignores it (and
+# `obot mcp convert-catalog` removes it). A fixedURL remote with no user config
+# is shared, and each user authorizes Google with their own OAuth token
+# (effectively multiUser).
+name: Google Calendar (Google Workspace)
+entryKey: gws-calendar
+shortDescription: List, search, create, update, and respond to Google Calendar events and find free time with Google's official Workspace MCP server
+description: |
+  List your calendars, search and read events, create, update, and delete events, RSVP to invitations, and find meeting times that work across attendees' calendars, all as your own Google account.
+
+  See Google's [Calendar MCP server reference](https://developers.google.com/workspace/calendar/api/v3/reference/mcp), [Configure the Calendar MCP server](https://developers.google.com/workspace/calendar/api/guides/configure-mcp-server), and [Configure the Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers) for setup, authentication, and current capabilities.
+
+  ## Features
+
+  - **Browse calendars**: list the calendars you own or subscribe to and resolve names like "family calendar" to calendar IDs.
+  - **Find events**: list events by time range, type, or keyword, fetch a single event, or run a semantic search over your primary calendar.
+  - **Manage events**: create, update, and delete events, including attendees, Google Meet links, attachments, reminders, recurrence, visibility, and working location.
+  - **Respond and schedule**: accept, decline, or tentatively accept invitations, and get suggested time slots across several attendees.
+
+  ## What you'll need to connect
+
+  Your Obot administrator sets this up once for everyone:
+
+  1. The Google Cloud project behind the OAuth client must be enrolled in the [Google Workspace Developer Preview Program](https://developers.google.com/workspace/preview).
+  2. In that project, enable the **Google Calendar API** (`calendar-json.googleapis.com`) and the **Calendar MCP service** (`calendarmcp.googleapis.com`).
+  3. On the Google Auth Platform **Data Access** page, add the Calendar MCP scopes:
+     - `https://www.googleapis.com/auth/calendar.calendarlist.readonly`
+     - `https://www.googleapis.com/auth/calendar.events.freebusy`
+     - `https://www.googleapis.com/auth/calendar.events.readonly`
+     - `https://www.googleapis.com/auth/calendar.events`
+
+     The server's protected-resource metadata also advertises broader Calendar scopes (for example `https://www.googleapis.com/auth/calendar`), and Obot requests what the server advertises, so allow those as well if Google's consent screen asks for them. An **Internal** audience avoids Google app verification.
+  4. The administrator enters the shared Google **Web application** OAuth client (redirect URI `https://<your-obot-host>/oauth/mcp/callback`) under this entry's **Configure OAuth Credentials** in Obot.
+
+  When you connect, Google asks you to authorize Obot. Tool calls run as your Google identity, limited to the scopes you grant and the calendars you can already access.
+
+  ## Notes
+
+  Google's Workspace MCP servers are in **Developer Preview**: tool names, parameters, and behavior may change without notice.
+metadata:
+  categories: Google Workspace,Productivity
+icon: https://upload.wikimedia.org/wikipedia/commons/f/fa/Google_Calendar_icon_(2026).svg
+repoURL: https://developers.google.com/workspace/calendar/api/v3/reference/mcp
+runtime: remote
+remoteConfig:
+  fixedURL: https://calendarmcp.googleapis.com/mcp/v1
+  staticOAuthRequired: true
+toolPreview:
+  - name: list_events
+    description: Returns events on the given calendar matching all specified constraints. Time constraints should not be specified unless requested by the user. For open-ended keyword or topic-based searches on the primary calendar, the search_events tool must be used instead.
+    params:
+      calendarId: 'Optional. ID of the calendar containing the events. Email address - can be resolved using `list_calendars`. Default: primary calendar.'
+      endTime: 'Optional. The upper bound of a time range. Must only be set when a specific timeframe or a time in the past is requested by the user. Must be an ISO 8601 timestamp greater than `startTime`. Default: `startTime` + 7 days. Follows the same rules as `startTime`, including when passing `startTime` + 7 days: no UTC offset and no trailing `Z`.'
+      eventType: 'Optional. The event types to return. If empty, only the following event types are returned: `DEFAULT`, `OUT_OF_OFFICE`, `FOCUS_TIME`, `FROM_GMAIL`'
+      eventTypeFilter: 'Optional. Deprecated: use `eventType` instead.'
+      fullText: Optional. Free-form case-insensitive search matching title, description, location, or attendees. Matches events containing all query terms verbatim (AND search).
+      orderBy: 'Optional. The order in which events should be returned. Possible values are: - `default` - Unspecified, but deterministic ordering (default). - `startTime` - Order by start time ascending. - `startTimeDesc` - Order by start time descending. - `lastModified` - Order by last modification time ascending.'
+      pageSize: 'Optional. Max events per page (default `100`, max `250`). Recommended: `10`.'
+      pageToken: Optional. Next page token. Use the value from the previous page's `nextPageToken`.
+      startTime: 'Optional. The lower bound of a time range. Must only be set when a specific timeframe is requested by the user. Must be an ISO 8601 timestamp less than `endTime`. Default: now. Pass the local time with no UTC offset and no trailing `Z` (for example `2026-04-30T10:00:00`), including when passing now; only include an offset if the user themselves stated one.'
+      timeZone: "Optional. The time zone (IANA ID, for example `Europe/Zurich`) used to resolve timezone-less dates. Only use this parameter if the user explicitly states a time zone, but always set it when they do, even if that time zone looks like the user's own. Otherwise leave it unset: the server resolves the user's time zone automatically."
+  - name: get_event
+    description: Returns a single event on the given calendar.
+    params:
+      calendarId: 'Optional. ID of the calendar containing the event. Email address - can be resolved using `list_calendars`. Default: primary calendar.'
+      eventId: Required. Event ID. Can be resolved using `list_events` or `search_events`.
+  - name: list_calendars
+    description: Returns the calendars this user owns or has subscribed to. These are the calendars that show up in the calendar list if the user opens Google Calendar. This tool returns a subset of all accessible calendars; other calendars shared with the user can be accessed directly by their `calendarId` (email identifier) without subscribing to them first.
+    params:
+      pageSize: Optional. Max results per page. Default `100`, max `250`.
+      pageToken: Optional. Token specifying which result page to return.
+  - name: suggest_time
+    description: Suggests time periods across one or more calendars.
+    params:
+      attendeeEmails: Required. Attendee emails to find free time for.
+      durationMinutes: 'Optional. Min duration of free slot in minutes. Default: `30`.'
+      endTime: Required. Query interval end (ISO 8601). Follows the same rules as `startTime`.
+      preferences: Preferences to find suggested time.
+      startTime: Required. Query interval start (ISO 8601). Pass the local time with no UTC offset and no trailing `Z` (for example `2026-04-30T10:00:00`); only include an offset if the user themselves stated one. If the user named a time zone, leave this without offset and put its IANA name in this request's top-level `timeZone` field.
+      timeZone: "Optional. The time zone the search times should be interpreted in (IANA ID, for example `Europe/Zurich`). Only use this parameter if the user explicitly states a time zone, but always set it when they do, even if that time zone looks like the user's own. Otherwise leave it unset: the server resolves the user's time zone automatically."
+  - name: create_event
+    description: Creates an event on the given calendar.
+    params:
+      addGoogleMeetUrl: 'Optional. Create and add a Google Meet URL. Default: `false`.'
+      allDay: Optional. Whether the event spans the entire day. If true, start/end times are treated as midnight.
+      attachments: Optional. File attachments.
+      attendeeEmails: 'Optional. Deprecated: use `attendees` instead.'
+      attendees: Optional. Attendees of the event. For events that are created on the user's primary calendar with at least one other attendee, the current user will automatically be added as an attendee if not already included.
+      availability: Optional. Availability setting.
+      calendarId: 'Optional. ID of the calendar to create the event on. Email address - can be resolved using `list_calendars`. Default: primary calendar.'
+      colorId: Optional. The color of the event. For a list of color IDs, refer to the documentation of the Event resource.
+      description: Optional. Description. Can contain HTML.
+      endTime: Required. End time (ISO 8601, for example `2026-04-30T11:00:00`). Follows the same rules as `startTime`.
+      eventType: Optional. Type of the event.
+      googleMeetUrl: Optional. Specific Google Meet URL or meeting ID. Overrides `addGoogleMeetUrl`.
+      guestPermissions: Optional. Guest permissions.
+      location: Optional. Location.
+      notificationLevel: 'Optional. Which email notification should be sent for this event update. Default: `ALL`.'
+      overrideReminders: Optional. Reminders override calendar defaults.
+      recurrenceData: Optional. Recurrence rules as `RRULE`, `RDATE`, or `EXDATE` strings (per RFC 5545).
+      startTime: Required. Start time (ISO 8601, for example `2026-04-30T10:00:00`). Pass the local time with no UTC offset and no trailing `Z`; only include an offset if the user themselves stated one. If the user named a time zone, leave this without offset and put its IANA name in this request's top-level `timeZone` field.
+      summary: Required. Title.
+      timeZone: "Optional. The time zone the event should be created in, as an IANA Time Zone Database name (for example, `America/Los_Angeles`). Only use this parameter if the user explicitly states a time zone, but always set it when they do, even if that time zone looks like the user's own. Otherwise leave it unset: the server resolves the user's time zone automatically."
+      useDefaultReminders: Optional. Whether to use the default reminders for the event. If true, the event will use default reminders. Cannot be set to true if `overrideReminders` are specified. If set to false and `overrideReminders` is empty or unset, the event will have no reminders. Defaults to `false` if `overrideReminders` is set, otherwise defaults to `true`.
+      visibility: 'Optional. Visibility of the event. Possible values are: - `default` - Uses the default visibility for events on the calendar. Default value. - `public` - The event is public and event details are visible to all readers of the calendar. - `private` - Only event attendees may view event details.'
+      workingLocationProperties: Optional. Working location properties (if `eventType` is `WORKING_LOCATION`).
+  - name: update_event
+    description: Updates an event on the given calendar.
+    params:
+      addGoogleMeetUrl: Optional. If true, creates or updates a Google Meet URL for the event. Ignored if Meet is disabled.
+      addedAttachments: Optional. File attachments to add to the event.
+      addedAttendeeEmails: 'Optional. Deprecated: use `addedAttendees` instead.'
+      addedAttendees: Optional. Attendees to add to the event.
+      allDay: Optional. Changes the event to all-day. If set, `startTime`/`endTime` must also be provided.
+      availability: Optional. Whether the event blocks time on the calendar.
+      calendarId: 'Optional. ID of the calendar containing the event. Email address - can be resolved using `list_calendars`. Default: primary calendar.'
+      colorId: Optional. New color of the event. For a list of color IDs, refer to the documentation of the Event resource.
+      description: Optional. New description. Can contain HTML.
+      endTime: Optional. New end time (ISO 8601). Follows the same rules as `startTime`.
+      eventId: Required. Event ID. Can be resolved using `list_events` or `search_events`.
+      googleMeetUrl: Optional. Allows attaching an existing Google Meet URL or meeting ID to the event. Overrides the value of `addGoogleMeetUrl`.
+      guestPermissions: Optional. Guest permission settings for this event.
+      location: Optional. New location.
+      notificationLevel: 'Optional. Email notification to send for this event update. Default: `ALL`.'
+      overrideReminders: Optional. If set, replaces all existing reminders for the event.
+      removedAttachmentFileUrls: Optional. File attachments to remove from the event.
+      removedAttendeeEmails: Optional. The attendees of the event to remove, as email addresses.
+      startTime: Optional. New start time (ISO 8601). Preserves duration if updating only start. Pass the local time with no UTC offset and no trailing `Z` (for example `2026-04-30T10:00:00`); only include an offset if the user themselves stated one. If the user named a time zone, leave this without offset and put its IANA name in this request's top-level `timeZone` field.
+      summary: Optional. New title.
+      timeZone: "Optional. The time zone the event should be updated to, as an IANA Time Zone Database name (for example, `America/Los_Angeles`). Only use this parameter if the user explicitly states a time zone, but always set it when they do, even if that time zone looks like the user's own. Otherwise leave it unset: the server resolves the user's time zone automatically."
+      useDefaultReminders: Optional. Whether to use the default reminders for the event. If true, the event will use default reminders (and clear override reminders). Cannot be set to true if `overrideReminders` are specified. If set to false and `overrideReminders` is empty or unset, all reminders are removed.
+      visibility: 'Optional. New visibility of the event. Possible values are: - `default` - Uses the default visibility for events on the calendar. Default value. - `public` - Event details are visible to all readers of the calendar. - `private` - The event is private and only event attendees may view event details.'
+  - name: delete_event
+    description: Deletes an event on the given calendar.
+    params:
+      calendarId: 'Optional. ID of the calendar containing the event. Email address - can be resolved using `list_calendars`. Default: primary calendar.'
+      eventId: Required. The ID of the event to delete.
+      notificationLevel: 'Optional. Which email notification should be sent for this event update. Default: `ALL`.'
+  - name: respond_to_event
+    description: Responds to an event on a calendar.
+    params:
+      calendarId: 'Optional. ID of the calendar containing the event. Email address - can be resolved using `list_calendars`. Default: primary calendar.'
+      eventId: Required. The ID of the event to respond to.
+      notificationLevel: 'Optional. Which email notification should be sent for this event update. Default: `EXTERNAL_ONLY`.'
+      responseComment: Optional. The user's comment attached to the response.
+      responseStatus: "Required. The new user's response status of the event. Possible values are: - `declined` - The attendee has declined the invitation. - `tentative` - The attendee has tentatively accepted the invitation. - `accepted` - The attendee has accepted the invitation."
+  - name: search_events
+    description: Searches events on the user's primary calendar using semantic search.
+    params:
+      pageSize: Optional. Maximum number of entries returned on one result page.
+      pageToken: Optional. Token specifying which result page to return.
+      query: Required. Query string to search for events (case-insensitive).
