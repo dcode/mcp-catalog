@@ -23,5 +23,5 @@ repos:
         name: validate catalog entries (scripts/validate.py)
         entry: uv run --frozen scripts/validate.py
         language: system
-        files: ^(remotes/|icons/|schema/|scripts/validate\.py$)
+        files: ^(remotes/|vmcps/|icons/|schema/|scripts/validate\.py$)
         pass_filenames: false

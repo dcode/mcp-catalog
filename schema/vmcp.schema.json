@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dcode/mcp-catalog/schema/vmcp.schema.json",
+  "title": "Obot vMCP catalog item (dcode/mcp-catalog conventions)",
+  "description": "One `type: vmcp` item as read by Obot v0.28.2 git catalog sync (pkg/mcpcatalog DecodeVMCPManifest + types.VMCPManifest). Obot ignores unknown fields; this schema is stricter so typos fail in CI.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "entryKey", "displayName", "components"],
+  "properties": {
+    "type": { "const": "vmcp" },
+    "entryKey": {
+      "description": "Stable key; with the source URL it determines the vMCP's Obot ID. Keep it unchanged so connections survive renames.",
+      "type": "string",
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+      "maxLength": 63
+    },
+    "displayName": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "icon": { "type": "string", "format": "uri", "pattern": "^https://" },
+    "toolSearch": {
+      "description": "true: clients discover tools via search_tools and call them via call_tool.",
+      "type": "boolean"
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/component" }
+    },
+    "profiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/profile" }
+    }
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "mcpServerCatalogEntryKey"],
+      "properties": {
+        "id": {
+          "description": "Stable, nonblank component ID. Profiles' allowedComponents use it as the map key; changing it orphans saved configuration.",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "mcpServerCatalogEntryKey": {
+          "description": "entryKey of an entry in this source, or <sourceID>::<entryKey> for another source of the same catalog (sourceID = source URL without scheme or trailing slash).",
+          "type": "string",
+          "pattern": "^([a-z0-9][a-z0-9.-]*(/[A-Za-z0-9._-]+)+::)?[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "configuration": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/configurationPolicy" }
+        },
+        "forceSingleUser": {
+          "description": "Forces a per-user deployment. Leave unset for OAuth remotes: each user already gets their own upstream token on a shared server.",
+          "type": "boolean"
+        },
+        "toolPrefix": { "type": "string" },
+        "toolOverrides": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "configurationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "policy"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1 },
+        "policy": { "enum": ["prohibited", "fixed", "userAllowed"] },
+        "secretBinding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "key"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "key": { "type": "string", "minLength": 1 }
+          }
+        }
+      },
+      "not": { "required": ["value"] },
+      "$comment": "Clear-text `value` is deliberately not modelled: use secretBinding for fixed values."
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "subjects"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "subjects": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "id"],
+            "properties": {
+              "type": { "enum": ["selector", "user", "group", "obotGroup"] },
+              "id": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "vmcpPermissions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowAllComponents": { "type": "boolean" },
+            "allowedComponents": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "allowedTools": {
+                    "description": "null = every enabled tool; [] = none.",
+                    "type": ["array", "null"],
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

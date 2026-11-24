@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Validate the catalog entries in remotes/*.yaml.
+"""Validate the catalog entries in remotes/*.yaml and the vMCPs in vmcps/*.yaml.
 
-Checks every entry against schema/catalog-entry.schema.json, then applies this
-repo's lint rules (see docs/catalog-entry-spec.md). With --network it also
-downloads each entry's icon URL and checks it is byte-identical to the local
-copy in icons/<entryKey>.svg (or .png when no SVG exists upstream).
+Checks every entry against schema/catalog-entry.schema.json and every vMCP
+against schema/vmcp.schema.json, then applies this repo's lint rules (see
+docs/catalog-entry-spec.md). With --network it also downloads each entry's icon
+URL and checks it is byte-identical to the local copy in icons/<entryKey>.svg
+(or .png when no SVG exists upstream). vMCP components that reference another
+source (SOURCE_ID::entryKey) are checked against --external-source checkouts.
 
 Usage:
-    uv run scripts/validate.py [--network] [--print-ids] [--root DIR] [FILE ...]
+    uv run scripts/validate.py [--network] [--print-ids] [--root DIR]
+        [--external-source SOURCE_ID=PATH ...] [FILE ...]
 
 Exit status is 1 if any error is found. Warnings never fail the run.
 """
@@ -32,7 +35,9 @@ from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = Path("schema/catalog-entry.schema.json")
+VMCP_SCHEMA_PATH = Path("schema/vmcp.schema.json")
 ENTRY_DIR = "remotes"
+VMCP_DIR = "vmcps"
 ICON_DIR = "icons"
 USER_AGENT = "dcode-mcp-catalog-validator/0.1 (https://github.com/dcode/mcp-catalog)"
 
@@ -423,6 +428,125 @@ def check_entry(
     return data, problems
 
 
+def load_vmcp_schema(root: Path) -> Draft202012Validator | None:
+    path = root / VMCP_SCHEMA_PATH
+    if not path.is_file():
+        return None
+    schema = json.loads(path.read_text())
+    Draft202012Validator.check_schema(schema)
+    return Draft202012Validator(schema)
+
+
+def entry_keys(root: Path) -> set[str]:
+    """entryKeys of the catalog entries in <root>/remotes, ignoring unparsable files."""
+    keys: set[str] = set()
+    for path in sorted((root / ENTRY_DIR).glob("*.yaml")) if (root / ENTRY_DIR).is_dir() else []:
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (yaml.YAMLError, UnicodeDecodeError):
+            continue
+        if isinstance(data, dict) and isinstance(data.get("entryKey"), str):
+            keys.add(data["entryKey"])
+    return keys
+
+
+def parse_external_source(value: str) -> tuple[str, Path]:
+    """Parse --external-source SOURCE_ID=PATH."""
+    source_id, sep, path = value.partition("=")
+    if not sep or not source_id or not path:
+        raise argparse.ArgumentTypeError("expected SOURCE_ID=PATH, e.g. github.com/dcode/mcp-catalog=../mcp-catalog")
+    return source_id.strip("/"), Path(path)
+
+
+def check_vmcp(
+    path: Path,
+    root: Path,
+    validator: Draft202012Validator | None,
+    local_keys: set[str],
+    external: dict[str, set[str]],
+) -> tuple[dict | None, list[Problem]]:
+    """Validate one vMCP file in vmcps/. Returns (parsed vMCP or None, problems)."""
+    rel = path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path)
+    problems: list[Problem] = []
+    text = path.read_text(encoding="utf-8")
+
+    if path.suffix != ".yaml":
+        problems.append(Problem("error", rel, "vMCP files must use the .yaml extension"))
+    if BANNED_PHRASE.search(text):
+        problems.append(Problem("error", rel, 'say "MCP", not "Model Context Protocol"'))
+    try:
+        data = load_yaml(text)
+    except yaml.YAMLError as exc:
+        return None, problems + [Problem("error", rel, f"YAML error: {exc}")]
+    if not isinstance(data, dict):
+        return None, problems + [Problem("error", rel, "file must contain exactly one mapping (one vMCP per file)")]
+    if data.get("type") != "vmcp":
+        return None, problems + [Problem("error", rel, "files in vmcps/ need `type: vmcp`; catalog entries belong in remotes/")]
+
+    if validator is None:
+        problems.append(Problem("error", rel, f"missing {VMCP_SCHEMA_PATH}"))
+    else:
+        for err in sorted(validator.iter_errors(data), key=lambda e: list(e.absolute_path)):
+            loc = ".".join(str(p) for p in err.absolute_path) or "<root>"
+            problems.append(Problem("error", rel, f"schema: {loc}: {err.message}"))
+
+    key = data.get("entryKey")
+    if isinstance(key, str):
+        if key != path.stem:
+            problems.append(Problem("error", rel, f"filename must be {key}.yaml (entryKey is {key!r})"))
+        if not any(key.startswith(p) for p in ALLOWED_PREFIXES):
+            problems.append(Problem("error", rel, f"entryKey {key!r} must start with one of {', '.join(ALLOWED_PREFIXES)}"))
+
+    for field in ("displayName", "description"):
+        if isinstance(data.get(field), str):
+            problems += [Problem("error", rel, f"{field}: {issue}") for issue in _text_issues(data[field])]
+
+    icon = data.get("icon")
+    if isinstance(icon, str):
+        host = urllib.parse.urlsplit(icon).hostname or ""
+        if host in FORBIDDEN_ICON_HOSTS:
+            problems.append(Problem("error", rel, f"icon must not be hosted on {host} (this repo may become private)"))
+
+    components = data.get("components") if isinstance(data.get("components"), list) else []
+    ids: set[str] = set()
+    for i, comp in enumerate(components):
+        if not isinstance(comp, dict):
+            continue
+        cid = comp.get("id")
+        where = f"components[{i}]"
+        if isinstance(cid, str):
+            if cid in ids:
+                problems.append(Problem("error", rel, f"{where}: duplicate component id {cid!r}"))
+            ids.add(cid)
+        ref = comp.get("mcpServerCatalogEntryKey")
+        if isinstance(ref, str):
+            source_id, sep, ref_key = ref.rpartition("::")
+            if not sep:
+                if ref not in local_keys:
+                    problems.append(Problem("error", rel, f"{where}: no entry with entryKey {ref!r} in {ENTRY_DIR}/"))
+            elif source_id in external:
+                if ref_key not in external[source_id]:
+                    problems.append(Problem("error", rel, f"{where}: {source_id} has no entry with entryKey {ref_key!r}"))
+            else:
+                problems.append(
+                    Problem("warning", rel, f"{where}: cannot check {ref!r}; pass --external-source {source_id}=<checkout>")
+                )
+        if comp.get("forceSingleUser") is True:
+            problems.append(
+                Problem("warning", rel, f"{where}: forceSingleUser deploys one server per user; OAuth remotes don't need it")
+            )
+
+    profiles = data.get("profiles") if isinstance(data.get("profiles"), list) else []
+    if not profiles:
+        problems.append(Problem("warning", rel, "no profiles: no user is granted any tools"))
+    for profile in profiles:
+        allowed = _get(profile, ("vmcpPermissions", "allowedComponents")) if isinstance(profile, dict) else None
+        for cid in allowed or {}:
+            if cid not in ids:
+                problems.append(Problem("error", rel, f"profile {profile.get('name')!r}: allowedComponents has unknown component id {cid!r}"))
+    return data, problems
+
+
 def fetch(url: str, timeout: float = 30.0) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - https enforced above
@@ -443,9 +567,42 @@ def check_icon_remote(entry: dict, root: Path, rel: str, fetcher=fetch) -> list[
     return []
 
 
-def validate_repo(
-    root: Path, files: list[Path] | None = None, network: bool = False, fetcher=fetch, upstream: Path | None = None
+def validate_vmcps(
+    root: Path, targets: set[Path] | None, external: dict[str, set[str]]
 ) -> tuple[list[dict], list[Problem]]:
+    """Validate every vmcps/*.yaml; only files in `targets` (None = all) report problems."""
+    vmcp_dir = root / VMCP_DIR
+    files = [f for f in sorted(vmcp_dir.glob("*")) if f.is_file() and not f.name.startswith(".")] if vmcp_dir.is_dir() else []
+    validator = load_vmcp_schema(root)
+    local_keys = entry_keys(root)
+    vmcps: list[dict] = []
+    problems: list[Problem] = []
+    keys: dict[str, str] = {}
+    for path in files:
+        data, file_problems = check_vmcp(path, root, validator, local_keys, external)
+        rel = path.relative_to(root).as_posix()
+        if targets is None or path.resolve() in targets:
+            problems += file_problems
+        if data is None:
+            continue
+        vmcps.append(data)
+        key = data.get("entryKey")
+        if isinstance(key, str):
+            if key in keys:
+                problems.append(Problem("error", rel, f"duplicate vMCP entryKey {key!r} (also in {keys[key]})"))
+            keys.setdefault(key, rel)
+    return vmcps, problems
+
+
+def validate_repo(
+    root: Path,
+    files: list[Path] | None = None,
+    network: bool = False,
+    fetcher=fetch,
+    upstream: Path | None = None,
+    external: dict[str, set[str]] | None = None,
+) -> tuple[list[dict], list[Problem]]:
+    """Validate remotes/ and vmcps/. Returns (entries followed by vMCPs, problems)."""
     validator = load_schema(root)
     reserved = load_reserved_names(root, upstream)
     all_files = sorted((root / ENTRY_DIR).glob("*")) if (root / ENTRY_DIR).is_dir() else []
@@ -487,7 +644,9 @@ def validate_repo(
                 problems.append(Problem("error", f"{ICON_DIR}/{icon_file.name}", "only .svg and .png icons are allowed"))
             elif icon_file.stem not in keys:
                 problems.append(Problem("warning", f"{ICON_DIR}/{icon_file.name}", "icon has no matching entry"))
-    return entries, problems
+
+    vmcps, vmcp_problems = validate_vmcps(root, {f.resolve() for f in files} if files else None, external or {})
+    return entries + vmcps, problems + vmcp_problems
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -498,6 +657,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--print-ids", action="store_true", help="print entryKey -> Obot entry object ID")
     parser.add_argument(
         "--upstream", type=Path, help="checkout of obot-platform/mcp-catalog; its entry names are reserved too"
+    )
+    parser.add_argument(
+        "--external-source",
+        type=parse_external_source,
+        action="append",
+        default=[],
+        metavar="SOURCE_ID=PATH",
+        help="checkout of another catalog source, so vMCP references like SOURCE_ID::entryKey can be checked",
     )
     parser.add_argument(
         "--refresh-upstream-names",
@@ -518,10 +685,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {len(names)} names to {UPSTREAM_NAMES_FILE}", file=sys.stderr)
         return 0
     files = [f if f.is_absolute() else (Path.cwd() / f) for f in args.files]
-    files = [f for f in files if f.suffix in (".yaml", ".yml") and (root / ENTRY_DIR) in f.resolve().parents]
+    files = [
+        f
+        for f in files
+        if f.suffix in (".yaml", ".yml") and ({root / ENTRY_DIR, root / VMCP_DIR} & set(f.resolve().parents))
+    ]
     if args.files and not files:
         return 0  # e.g. pre-commit passed only non-entry files
-    entries, problems = validate_repo(root, files or None, network=args.network, upstream=args.upstream)
+    external = {source_id: entry_keys(path.resolve()) for source_id, path in args.external_source}
+    items, problems = validate_repo(
+        root, files or None, network=args.network, upstream=args.upstream, external=external
+    )
+    entries = [i for i in items if i.get("type") != "vmcp"]
+    vmcps = [i for i in items if i.get("type") == "vmcp"]
 
     for problem in problems:
         print(problem, file=sys.stderr)
@@ -535,7 +711,9 @@ def main(argv: list[str] | None = None) -> int:
             note = "  (>=64 chars: Obot truncates; verify via API)" if len(oid) >= 64 else ""
             print(f"{entry.get('entryKey')}\t{oid}{note}")
 
-    print(f"{len(entries)} entries checked: {errors} error(s), {warnings} warning(s)", file=sys.stderr)
+    print(
+        f"{len(entries)} entries, {len(vmcps)} vMCPs checked: {errors} error(s), {warnings} warning(s)", file=sys.stderr
+    )
     return 1 if errors else 0
 
 

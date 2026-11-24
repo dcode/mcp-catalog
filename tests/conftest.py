@@ -42,6 +42,7 @@ ENTRY = textwrap.dedent(
 def repo(tmp_path: Path) -> Path:
     (tmp_path / "schema").mkdir()
     shutil.copy(REPO / "schema" / "catalog-entry.schema.json", tmp_path / "schema")
+    shutil.copy(REPO / "schema" / "vmcp.schema.json", tmp_path / "schema")
     (tmp_path / "remotes").mkdir()
     (tmp_path / "icons").mkdir()
     (tmp_path / "remotes" / "gws-gmail.yaml").write_text(ENTRY)
