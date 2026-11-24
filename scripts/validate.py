@@ -147,8 +147,18 @@ def object_id(name: str, catalog: str = "default") -> str:
     return f"{catalog}-{sanitized}-{digest}"
 
 
+def tooling_file(root: Path, rel: Path | str) -> Path:
+    """<root>/<rel> if present, else this script's own repo copy.
+
+    Lets another catalog source (e.g. a private one) run this validator with
+    --root without vendoring schema/.
+    """
+    candidate = root / rel
+    return candidate if candidate.exists() else ROOT / rel
+
+
 def load_schema(root: Path) -> Draft202012Validator:
-    schema = json.loads((root / SCHEMA_PATH).read_text())
+    schema = json.loads(tooling_file(root, SCHEMA_PATH).read_text())
     Draft202012Validator.check_schema(schema)
     return Draft202012Validator(schema)
 
@@ -312,7 +322,7 @@ def scan_upstream_names(checkout: Path) -> set[str]:
 def load_reserved_names(root: Path, upstream: Path | None = None) -> frozenset[str]:
     """Sanitized names of every entry in Obot's default catalog."""
     names = set(RESERVED_NAMES)
-    vendored = root / UPSTREAM_NAMES_FILE
+    vendored = tooling_file(root, UPSTREAM_NAMES_FILE)
     if vendored.is_file():
         names.update(
             line.strip() for line in vendored.read_text(encoding="utf-8").splitlines() if line.strip() and not line.startswith("#")
@@ -429,7 +439,7 @@ def check_entry(
 
 
 def load_vmcp_schema(root: Path) -> Draft202012Validator | None:
-    path = root / VMCP_SCHEMA_PATH
+    path = tooling_file(root, VMCP_SCHEMA_PATH)
     if not path.is_file():
         return None
     schema = json.loads(path.read_text())

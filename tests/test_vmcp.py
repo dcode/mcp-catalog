@@ -150,3 +150,14 @@ def test_main_external_source_flag(repo, tmp_path, capsys):
 def test_parse_external_source_rejects_bad_value():
     with pytest.raises(validate.argparse.ArgumentTypeError):
         validate.parse_external_source("no-equals-sign")
+
+
+def test_schemas_fall_back_to_tooling_repo(repo):
+    write_vmcp(repo)
+    for name in ("catalog-entry.schema.json", "vmcp.schema.json"):
+        (repo / "schema" / name).unlink()
+    (repo / "schema").rmdir()
+    assert errors_for(repo) == []
+    # Obot default-catalog names still come from this repo's vendored list.
+    (repo / "remotes" / "gws-gmail.yaml").write_text(ENTRY.replace("Gmail (Google Workspace)", "Asana"))
+    assert any("collides with an entry in Obot's default catalog" in e for e in errors_for(repo))
