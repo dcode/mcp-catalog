@@ -186,6 +186,12 @@ in the UI or as a `type: vmcp` item in `vmcps/`. Reference components by
 `entryKey`. From another source, use the source ID: for example,
 `github.com/dcode/mcp-catalog::gws-gmail`. Do not set `forceSingleUser`.
 
+The "Google Workspace" vMCP that bundles these nine servers with the
+self-hosted Google Tasks MCP lives in a separate private catalog source, so
+this public repo does not publish the self-hosted server's hostname. Its CI
+runs this repo's `scripts/validate.py` with
+`--external-source github.com/dcode/mcp-catalog=<checkout>`.
+
 ## Keeping tool previews current
 
 Google changes these servers often during the preview. The `tool-preview` job

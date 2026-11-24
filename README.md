@@ -14,7 +14,7 @@ entries with static OAuth. See [docs/google-workspace.md](docs/google-workspace.
 | --- | --- |
 | `remotes/<entryKey>.yaml` | Catalog entries, one per file. This is what Obot syncs. |
 | `icons/<entryKey>.svg` | Byte-identical local copy of each entry's `icon` URL. |
-| `vmcps/` | Optional `type: vmcp` items. None yet. |
+| `vmcps/` | Optional `type: vmcp` items, validated against `schema/vmcp.schema.json`. None yet. |
 | `schema/catalog-entry.schema.json` | Strict JSON Schema for entries. |
 | `scripts/validate.py` | Schema and lint checks for entries and icons. |
 | `scripts/tool_preview.py` | Regenerates `toolPreview` from each server's live `tools/list`. |

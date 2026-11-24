@@ -35,7 +35,7 @@ rules below.
 | --- | --- |
 | `remotes/<entryKey>.yaml` | One entry per file. A single mapping, not a list. Extension `.yaml`. |
 | `icons/<entryKey>.svg` | Byte-identical copy of the entry's `icon` URL. Use `.png` only when no SVG exists upstream. |
-| `vmcps/<entryKey>.yaml` | Optional `type: vmcp` items. Not covered by the schema yet. |
+| `vmcps/<entryKey>.yaml` | Optional `type: vmcp` items, one per file. Checked against `schema/vmcp.schema.json` (see [vMCPs](#vmcps)). |
 
 ## entryKey prefixes
 
@@ -166,3 +166,26 @@ Both modes also lint the full live tool definitions (every description and
 `inputSchema` string, including the parts the preview drops) with the same
 hidden-character and injection-phrase rules, and print `LINT` lines. Lint
 findings are reported but do not change the exit code.
+
+## vMCPs
+
+A file in `vmcps/` holds one `type: vmcp` item. Obot syncs it as a vMCP whose
+ID comes from the source URL and `entryKey`, so keep `entryKey` stable.
+`scripts/validate.py` checks:
+
+- the item against `schema/vmcp.schema.json`. That schema rejects
+  `minObotVersion`/`maxObotVersion` (Obot refuses them on vMCPs) and a
+  clear-text `value` on a `fixed` configuration policy (use `secretBinding`);
+- the file name equals `entryKey` and the prefix is allowed (see above);
+- every component has a unique, nonblank `id`. Profiles key
+  `allowedComponents` by that ID, and changing it orphans saved configuration;
+- each `mcpServerCatalogEntryKey` resolves. A bare key must match an entry in
+  `remotes/`. A `<sourceID>::<entryKey>` reference to another source is
+  checked against `--external-source <sourceID>=<checkout>`, and is only a
+  warning when no checkout is given. `sourceID` is the source URL without the
+  scheme or a trailing slash, for example `github.com/dcode/mcp-catalog`;
+- `displayName` and `description` pass the same hidden-text lint as entries.
+
+It warns when a vMCP has no profiles (nobody gets any tools) or a component sets
+`forceSingleUser` (OAuth remotes already get a per-user upstream token on a
+shared server).
