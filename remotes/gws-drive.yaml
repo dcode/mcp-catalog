@@ -77,6 +77,7 @@ toolPreview:
     params:
       excludeContentSnippets: If `true`, the content snippet will be excluded from the response. Must not be set to `true` if `snippetVerbosity` is specified.
       fileId: Required. The ID of the file to retrieve.
+      includeExternalityState: Optional. When true, also returns `externality_state`. Defaults to `false`.
       includeRichMetadata: Optional. When true, also returns `owner_name`, `last_modifying_user_name`, `last_modifying_user_email`, `visibility`, and `last_commented_time`. Defaults to `false`.
       snippetVerbosity: Optional. Set to specify how verbose the snippets should be. Defaults to `DETAILED` if not set. Must not be set if `excludeContentSnippets` is `true`.
   - name: get_file_permissions
@@ -87,6 +88,7 @@ toolPreview:
     description: Call this tool to find recent files for a user specified a sort order. Default sort order is `recency` if orderBy is not set or set to an unsupported value.
     params:
       excludeContentSnippets: If `true`, the content snippet will be excluded from the response. Must not be set to `true` if `snippetVerbosity` is specified.
+      includeExternalityState: Optional. When true, also returns `externality_state` for each file. Defaults to `false`.
       orderBy: The sort order for the files.
       pageSize: The maximum number of files to return.
       pageToken: The page token to use for pagination.
@@ -100,6 +102,7 @@ toolPreview:
     description: "Search for Drive files using a structured query (syntax: `query_term operator values`). Only terms in this list are supported. Combine clauses with `and`, `or`, `not`, and parentheses. String values must be single-quoted; escape embedded quotes as `\\'`."
     params:
       excludeContentSnippets: If `true`, the content snippet will be excluded from the response. Must not be set to `true` if `snippetVerbosity` is specified.
+      includeExternalityState: Optional. When true, also returns `externality_state` for each file. Defaults to `false`.
       includeRichMetadata: Optional. When true, also returns `owner_name`, `last_modifying_user_name`, `last_modifying_user_email`, `visibility`, and `last_commented_time`. Defaults to `false`.
       orderBy: 'Optional. The sort order for the search results. Specifies a single sort clause with syntax `<field> [asc|desc]`. Supported fields: - `modifiedTime` (defaults to `desc`) - `viewedByMeTime` (defaults to `desc`) Examples: `modifiedTime desc`, `viewedByMeTime`. If omitted or empty, results are ordered by relevance descending. Unsupported fields or invalid directions return an error.'
       pageSize: The maximum number of files to return in each page.
