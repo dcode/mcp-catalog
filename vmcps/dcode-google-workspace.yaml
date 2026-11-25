@@ -1,0 +1,52 @@
+# One endpoint for Google's ten official Workspace MCP servers (the gws-* entries in remotes/).
+# Component IDs are stable keys for saved configuration and profile grants: never rename them.
+# Leave forceSingleUser unset: every component is an OAuth remote, so each user already gets
+# their own upstream Google token on one shared server.
+type: vmcp
+entryKey: dcode-google-workspace
+displayName: Google Workspace
+description: |
+  Gmail, Calendar, Chat, Docs, Drive, People, Sheets, Slides, Tasks, and Workspace Search through Google's official Workspace MCP servers. Each user signs in with their own Google account.
+icon: https://upload.wikimedia.org/wikipedia/commons/3/3c/Google_Favicon_2025.svg
+# 60+ tools: clients find them with search_tools and run them with call_tool.
+toolSearch: true
+components:
+  - id: gmail
+    name: Gmail
+    mcpServerCatalogEntryKey: gws-gmail
+  - id: calendar
+    name: Google Calendar
+    mcpServerCatalogEntryKey: gws-calendar
+  - id: chat
+    name: Google Chat
+    mcpServerCatalogEntryKey: gws-chat
+  - id: docs
+    name: Google Docs
+    mcpServerCatalogEntryKey: gws-docs
+  - id: drive
+    name: Google Drive
+    mcpServerCatalogEntryKey: gws-drive
+  - id: people
+    name: Google People
+    mcpServerCatalogEntryKey: gws-people
+  - id: sheets
+    name: Google Sheets
+    mcpServerCatalogEntryKey: gws-sheets
+  - id: slides
+    name: Google Slides
+    mcpServerCatalogEntryKey: gws-slides
+  - id: search
+    name: Google Workspace Search
+    mcpServerCatalogEntryKey: gws-search
+  - id: tasks
+    name: Google Tasks
+    mcpServerCatalogEntryKey: gws-tasks
+profiles:
+  # Everyone signed in to Obot. Google sign-in still limits who can use each server
+  # (the OAuth consent screen is External in testing mode: listed test users only).
+  - name: Everything
+    subjects:
+      - type: selector
+        id: "*"
+    vmcpPermissions:
+      allowAllComponents: true

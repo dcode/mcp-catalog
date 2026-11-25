@@ -1,0 +1,104 @@
+# Display name carries the "(Google Workspace)" suffix like the other gws- entries, so it
+# cannot collide with an upstream or self-hosted "Google Tasks" entry.
+# serverUserType is intentionally omitted: Obot v0.28.2 ignores it (and
+# `obot mcp convert-catalog` removes it). A fixedURL remote with no user config
+# is shared, and each user authorizes Google with their own OAuth token
+# (effectively multiUser).
+name: Google Tasks (Google Workspace)
+entryKey: gws-tasks
+shortDescription: List, create, update, complete, and restore Google Tasks with Google's official Workspace MCP server
+description: |
+  List your task lists and tasks, create and edit to-dos, reminders, and recurring tasks, mark them complete or uncomplete, and delete or restore them, all as your own Google account.
+
+  See Google's [Tasks MCP server reference](https://developers.google.com/workspace/tasks/reference/mcp), [Configure the Tasks MCP server](https://developers.google.com/workspace/tasks/guides/configure-mcp-server), and [Configure the Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers) for setup, authentication, and current capabilities.
+
+  ## Features
+
+  - **Browse tasks**: list your task lists, list open tasks across all lists or in one list, and fetch a single task, including completed and deleted ones.
+  - **Manage tasks**: create and edit tasks with descriptions, scheduled dates and times, deadlines, recurrence, and Google Drive attachments, and delete them.
+  - **Track progress**: mark tasks complete or uncomplete, and restore tasks you deleted.
+
+  ## What you'll need to connect
+
+  Your Obot administrator sets this up once for everyone:
+
+  1. The Google Cloud project behind the OAuth client must be enrolled in the [Google Workspace Developer Preview Program](https://developers.google.com/workspace/preview).
+  2. In that project, enable the **Tasks MCP service** (`tasksmcp.googleapis.com`). Tasks does not need a separate product API enabled.
+  3. On the Google Auth Platform **Data Access** page, add the Tasks MCP scopes:
+     - `https://www.googleapis.com/auth/tasks.readonly`
+     - `https://www.googleapis.com/auth/tasks`
+
+     An **Internal** audience avoids Google app verification.
+  4. The administrator enters the shared Google **Web application** OAuth client (redirect URI `https://<your-obot-host>/oauth/mcp/callback`) under this entry's **Configure OAuth Credentials** in Obot.
+
+  When you connect, Google asks you to authorize Obot. Tool calls run as your Google identity, limited to the scopes you grant and the task lists you can already access.
+
+  ## Notes
+
+  Google's Workspace MCP servers are in **Developer Preview**: tool names, parameters, and behavior may change without notice.
+metadata:
+  categories: Google Workspace,Productivity
+icon: https://upload.wikimedia.org/wikipedia/commons/3/3f/Google_Tasks_Logo_05.2026.svg
+repoURL: https://developers.google.com/workspace/tasks/reference/mcp
+runtime: remote
+remoteConfig:
+  fixedURL: https://tasksmcp.googleapis.com/mcp/v1
+  staticOAuthRequired: true
+toolPreview:
+  - name: list_task_lists
+    description: Returns the task lists of the authenticated user.
+    params:
+      pageSize: Optional. The maximum number of task lists to return. Defaults to 100.
+  - name: list_tasks
+    description: Returns the user's tasks (to-dos and reminders). Unless `filter.taskListId` is set, tasks from all task lists are returned. By default, only uncompleted tasks are returned and deleted tasks are excluded. Tasks are not returned in the order shown in the Google Tasks apps; to get that order, sort tasks with the same task list and `parentTaskId` by `position`.
+    params:
+      filter: Optional. Structured filtering criteria to filter returned tasks.
+      pageSize: Optional. The maximum number of tasks to return. Defaults to 100.
+      pageToken: Optional. The `nextPageToken` received from a previous `list_tasks` call. All other request fields must match the call that returned the token.
+  - name: get_task
+    description: Returns a single task by its ID. Unlike `list_tasks`, completed and deleted tasks are always returned (indicated by `completed` and `deleted`).
+    params:
+      taskId: Required. The ID of the task to return. Can be resolved using `list_tasks`.
+  - name: create_task
+    description: Creates a new task in a list. A task is a to-do or a reminder for an action the user needs to complete, usually with flexible timing. Tasks often start with a verb, e.g., "review", "prepare", "submit", "send". A task with a scheduled date and time also works as a reminder, and the user is notified at that time.
+    params:
+      attachments: Optional. Attachments to add to the task. Currently, only Google Drive files (`driveAttachment`) are supported. At most 25 attachments can be added.
+      deadlineDate: Optional. Deadline/due date of the task (YYYY-MM-DD). ONLY use `deadlineDate` when the user explicitly specifies a deadline or due date using 'by [date]', 'due', 'due by', 'due on', or 'deadline'. Repeating tasks cannot have deadlines.
+      description: Optional. The description of the task. At most 8192 characters; characters outside the Basic Multilingual Plane, such as most emojis, count as two.
+      recurrenceRule: Optional. The recurrence rule of the task if applicable. Leave empty for a non-recurring task. `scheduledDate` should match the schedule; otherwise it's kept as an extra first occurrence.
+      scheduledDate: Optional. Scheduled date of the task (YYYY-MM-DD). Use this when the user specifies when to do the task ('task for tomorrow', 'do this on Friday', 'schedule for Monday').
+      scheduledTime: Optional. The scheduled time of the task (HH:MM:SS) in ISO 8601 extended format. Requires `scheduledDate`.
+      taskListId: Optional. The identifier of the task list in which the task is created. If not specified, the task will be created on the user's default task list (`"~default"`).
+      timeZone: Optional. The IANA time zone ID (e.g., `"America/New_York"`, `"UTC"`) used to resolve `scheduledDate`, `scheduledTime`, and `deadlineDate`. Set this to the user's time zone whenever any of these fields is specified. If omitted, defaults to `"UTC"`.
+      title: Optional. The title of the task. At most 1024 characters; characters outside the Basic Multilingual Plane, such as most emojis, count as two.
+  - name: update_task
+    description: "Updates an existing task. Note: To mark a task as completed or uncompleted, use `complete_task` or `uncomplete_task` instead. Limitation: An existing non-recurring task can't be made recurring. If the user asks for it, explain that this isn't supported and that they can make the task repeat in the Google Tasks app."
+    params:
+      addedAttachments: 'Optional. Attachments to add to the task. Currently, only Google Drive files (`driveAttachment`) are supported. At most 25 attachments can be added. Note: Cannot be set when `updateSeries` is `true`.'
+      deadlineDate: "Optional. The new deadline/due date of the task (YYYY-MM-DD). ONLY use `deadlineDate` when the user explicitly specifies a deadline or due date using 'by [date]', 'due', 'due by', 'due on', or 'deadline'. To remove a deadline, explicitly pass an empty string `\"\"` for `deadlineDate`. Omit to retain current value. Note: Cannot be set when `updateSeries` is `true`."
+      description: Optional. The new description of the task. Omit to retain current value, set to empty string `""` to clear. At most 8192 characters; characters outside the Basic Multilingual Plane, such as most emojis, count as two.
+      recurrenceRule: Optional. The new recurrence rule of a recurring task. Omit to keep the existing recurrence rule unmodified. Requires `updateSeries` to be `true`. Can't be used to make a non-recurring task recurring, which isn't supported.
+      removedAttachmentIds: 'Optional. IDs of attachments to remove from the task, as returned in `attachments.attachmentId`. Note: Cannot be set when `updateSeries` is `true`.'
+      scheduledDate: Optional. The new scheduled date of the task (YYYY-MM-DD). Use this when the user specifies when to do the task ('reschedule for tomorrow', 'move to Friday'). Omit to retain current value, set to empty string `""` to clear. Cannot be cleared on a recurring task (neither the series nor a single instance), because recurring tasks must always have a scheduled date.
+      scheduledTime: 'Optional. The new scheduled time of the task (HH:MM:SS) in ISO 8601 extended format. Omit to retain current value, set to empty string `""` to clear. Setting it requires a scheduled date: either `scheduledDate` in the same request, or the existing scheduled date of the task. If `updateSeries` is `true`, this updates or clears the scheduled time of the recurrence series.'
+      taskId: Required. The ID of the task to update.
+      timeZone: Optional. The IANA time zone ID (e.g., `"America/New_York"`, `"UTC"`) used to resolve `scheduledDate`, `scheduledTime`, and `deadlineDate`. Set this to the user's time zone whenever any of these fields is specified. If omitted, the task's existing time zone is retained, or `"UTC"` if it has none.
+      title: Optional. The new title of the task. Omit to retain current value, set to empty string `""` to clear. At most 1024 characters; characters outside the Basic Multilingual Plane, such as most emojis, count as two.
+      updateSeries: 'Optional. Whether to update the whole recurrence series of a recurring task instead of a single task instance. Defaults to `false`. Only applies to recurring tasks. Note: `deadlineDate` cannot be updated when `updateSeries` is `true`, and `updateSeries` cannot be `true` for a completed task.'
+  - name: delete_task
+    description: Deletes an existing task. A deleted task can be restored with `undelete_task`, unless it is shared or the whole recurrence series was deleted. Deleting a task that is already deleted has no effect.
+    params:
+      deleteSeries: 'Optional. Whether to delete the whole recurrence series instead of a single task. Defaults to `false`. Deleting a recurrence series is permanent: unlike a single deleted task, the series and its occurrences cannot be restored afterwards, so make sure the user wants to delete all occurrences.'
+      taskId: Required. The ID of the task to delete.
+  - name: undelete_task
+    description: Restores a deleted task. Use `list_tasks` with `filter.includeDeleted` (or `get_task`) to find the ID of a deleted task. Only tasks that are not shared can be restored, and a single occurrence of a recurring task cannot be restored if the whole recurrence series was deleted. Tasks of a deleted task list cannot be restored either. Restoring a task that is not deleted has no effect.
+    params:
+      taskId: Required. The ID of the deleted task to restore.
+  - name: complete_task
+    description: Marks a task as complete.
+    params:
+      taskId: Required. The ID of the task to complete.
+  - name: uncomplete_task
+    description: Marks a task as uncomplete.
+    params:
+      taskId: Required. The ID of the task to uncomplete.
