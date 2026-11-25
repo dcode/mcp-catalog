@@ -22,6 +22,7 @@ Each product also has a reference page, such as
 | `gws-chat` | Google Chat (Google Workspace) | `https://chatmcp.googleapis.com/mcp/v1` | `default-google-chat-google-workspace-c05cee78` |
 | `gws-people` | Google People (Google Workspace) | `https://people.googleapis.com/mcp/v1` | `default-google-people-google-workspace-ee9bb1b2` |
 | `gws-search` | Google Workspace Search | `https://workspacemcp.googleapis.com/mcp/v1` | `default-google-workspace-search-ff12dc69` |
+| `gws-tasks` | Google Tasks (Google Workspace) | `https://tasksmcp.googleapis.com/mcp/v1` | `default-google-tasks-google-workspace-2ef7df66` |
 
 The display names carry a "(Google Workspace)" suffix because Obot's default
 catalog already has entries named `Gmail`, `Google Drive`, and so on. Obot
@@ -44,12 +45,12 @@ with `GET /api/mcp-catalogs/default/entries`.
      chat.googleapis.com people.googleapis.com \
      gmailmcp.googleapis.com drivemcp.googleapis.com docsmcp.googleapis.com \
      sheetsmcp.googleapis.com slidesmcp.googleapis.com calendarmcp.googleapis.com \
-     chatmcp.googleapis.com workspacemcp.googleapis.com \
+     chatmcp.googleapis.com workspacemcp.googleapis.com tasksmcp.googleapis.com \
      --project=PROJECT_ID
    ```
 
    People serves MCP from `people.googleapis.com` itself. Universal Search
-   (`workspacemcp`) needs no separate product API.
+   (`workspacemcp`) and Tasks (`tasksmcp`) need no separate product API.
 3. **Consent screen (Google Auth Platform → Branding / Audience).** Set the
    audience to **Internal**. Gmail's `https://mail.google.com/` and Drive's
    `drive` scopes are restricted, and an External app would need Google's
@@ -61,7 +62,7 @@ with `GET /api/mcp-catalogs/default/entries`.
    - Authorized redirect URI: `https://obot.ditch.family/oauth/mcp/callback`
    - Authorized JavaScript origins: none needed.
 
-   All nine entries share this one client.
+   All ten entries share this one client.
 6. **Chat app (write access only).** To send Chat messages, configure a Chat
    app in the project (Google Chat API → Configuration). Read-only Chat tools
    work without it.
@@ -90,6 +91,7 @@ Re-check them with
 | Calendar | `calendar`, `calendar.acls`, `calendar.calendarlist`, `calendar.calendarlist.readonly`, `calendar.calendars`, `calendar.calendars.readonly`, `calendar.events`, `calendar.events.freebusy`, `calendar.events.readonly`, `calendar.freebusy`, `calendar.readonly`, `calendar.settings.readonly` |
 | Chat | `chat.spaces`, `chat.spaces.readonly`, `chat.memberships`, `chat.memberships.readonly`, `chat.messages`, `chat.messages.readonly`, `chat.messages.create`, `chat.users.readstate`, `chat.users.readstate.readonly`, `chat.users.spacesettings` |
 | People | `directory.readonly`, `userinfo.profile`, `contacts.readonly` |
+| Tasks | `tasks`, `tasks.readonly` |
 | Universal Search | `drive`, `drive.readonly`, `https://mail.google.com/`, `gmail.modify`, `gmail.readonly`, `calendar`, `calendar.readonly`, `chat.messages`, `chat.messages.readonly`, `chat.spaces.readonly`, `chat.memberships.readonly` |
 
 Users consent to the broad scopes (`https://mail.google.com/`, `drive`). Limit
@@ -101,7 +103,7 @@ what the tools can actually do with Obot tool selection (or
 Every entry sets `staticOAuthRequired: true`. Obot keeps the client in its own
 credential store (context `mcp-oauth-<entry ID>`). It cannot read the client
 from a Kubernetes Secret, so the client has to be set through the API or the
-UI once for each entry, nine times in total. Until it is set, non-admins
+UI once for each entry, ten times in total. Until it is set, non-admins
 cannot see the entry. The credential survives re-syncs because the entry ID
 does not change.
 
@@ -181,16 +183,17 @@ fallback is not needed.
 
 ## vMCP
 
-Users connect through a vMCP, which can bundle all nine servers, either built
+Users connect through a vMCP, which can bundle all ten servers, either built
 in the UI or as a `type: vmcp` item in `vmcps/`. Reference components by
 `entryKey`. From another source, use the source ID: for example,
 `github.com/dcode/mcp-catalog::gws-gmail`. Do not set `forceSingleUser`.
 
-The "Google Workspace" vMCP that bundles these nine servers with the
-self-hosted Google Tasks MCP lives in a separate private catalog source, so
-this public repo does not publish the self-hosted server's hostname. Its CI
-runs this repo's `scripts/validate.py` with
-`--external-source github.com/dcode/mcp-catalog=<checkout>`.
+`vmcps/dcode-google-workspace.yaml` is the "Google Workspace" vMCP. It bundles
+all ten `gws-*` servers, including Google's official Tasks server, so it needs
+nothing from the private source. The self-hosted Google Tasks MCP
+(`dcode-google-tasks`) stays in the private
+[dcode/mcp-catalog-private](https://github.com/dcode/mcp-catalog-private)
+source, which keeps its hostname out of this repo.
 
 ## Keeping tool previews current
 
